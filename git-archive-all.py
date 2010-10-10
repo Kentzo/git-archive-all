@@ -8,11 +8,11 @@ from sys import argv, stdout
 git_repositary_path = path.abspath('')
 git_repositary_name = path.basename(git_repositary_path)
 
-parser = OptionParser(usage="usage: %prog [options] <tree-ish>", version="%prog 1.0")
-parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], default='tar', help="Format of the resulting archive: tar or zip. The default output format is %default.")
-parser.add_option('--prefix', type='string', dest='prefix', default='', help="Prepend %dest to each filename in the archive.")
-parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='Output file')
-parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='Enabel verbose mode')
+parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [--format FORMAT] [-v] [--prefix PREFIX]", version="%prog 1.0")
+parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], default='tar', help="format of the resulting archive: tar or zip. The default output format is %default")
+parser.add_option('--prefix', type='string', dest='prefix', default='', help="prepend PREFIX to each filename in the archive")
+parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
+parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enabel verbose mode')
 
 (options, args) = parser.parse_args()
 
