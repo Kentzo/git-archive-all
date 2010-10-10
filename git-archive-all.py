@@ -3,7 +3,7 @@
 from os import path, chdir
 from subprocess import Popen, PIPE
 from optparse import OptionParser
-from sys import argv
+from sys import argv, stdout
 
 git_repositary_path = path.abspath('')
 git_repositary_name = path.basename(git_repositary_path)
@@ -11,11 +11,17 @@ git_repositary_name = path.basename(git_repositary_path)
 parser = OptionParser(usage="usage: %prog [options] <tree-ish>", version="%prog 1.0")
 parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], default='tar', help="Format of the resulting archive: tar or zip. The default output format is %default.")
 parser.add_option('--prefix', type='string', dest='prefix', default='', help="Prepend %dest to each filename in the archive.")
-parser.add_option('-o', '--output', type='string', dest='output_file', default=path.join(git_repositary_path, git_repositary_name), help='Write the archive to <file> instead of stdout')
+parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='Output file')
+parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='Enabel verbose mode')
 
 (options, args) = parser.parse_args()
 
-print options.output_file
+if options.output_file == '':
+   parser.error('You must specify output file')
+elif path.isdir(options.output_file):
+   parser.error('You cannot use directory as output')
+
+#print options.output_file
 
 def git_files(baselevel=''):
    for filepath in Popen('git ls-files --cached --full-name --no-empty-directory', shell=True, stdout=PIPE).stdout.read().splitlines():
@@ -35,9 +41,11 @@ if options.format == 'zip':
     from zipfile import ZipFile, ZIP_DEFLATED
     output_archive = ZipFile(path.abspath(options.output_file), 'w')
     for name, arcname in git_files():
+       if options.verbose: print 'Compressing ' + arcname + '...'
        output_archive.write(name, options.prefix + arcname, ZIP_DEFLATED)
 elif options.format == 'tar':
     from tarfile import TarFile
     output_archive = TarFile(path.abspath(options.output_file), 'w')
     for name, arcname in git_files():
+       if options.verbose: print 'Compressing ' + arcname + '...'
        output_archive.add(name, options.prefix + arcname)
