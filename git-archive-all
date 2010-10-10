@@ -12,7 +12,7 @@ parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [--format FORMAT]
 parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], default='tar', help="format of the resulting archive: tar or zip. The default output format is %default")
 parser.add_option('--prefix', type='string', dest='prefix', default='', help="prepend PREFIX to each filename in the archive")
 parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
-parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enabel verbose mode')
+parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
 (options, args) = parser.parse_args()
 
