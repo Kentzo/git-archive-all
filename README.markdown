@@ -14,4 +14,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   
   **-o OUTPUT_FILE, --output=OUTPUT_FILE** Output file
   
-  **-v, --verbose**         enabel verbose mode
+  **-v, --verbose**         enable verbose mode
+
+  **--no-exclude**         Dont read .gitattributes files for patterns containing export-ignore attrib
+
