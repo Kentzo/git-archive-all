@@ -19,6 +19,7 @@ parser.add_option('--prefix', type='string', dest='prefix',
 					default='', help="prepend PREFIX to each filename in the archive")
 					
 parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
+parser.add_option('-z', '--gzip', action='store_true', dest='gzip', help='if using tar format, use gzip compression')
 parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
 parser.add_option('--no-exclude', action='store_false', dest='exclude', 
@@ -92,8 +93,12 @@ if options.format == 'zip':
 		output_archive.write(name, options.prefix + arcname, ZIP_DEFLATED)
 
 elif options.format == 'tar':
-	from tarfile import TarFile
-	output_archive = TarFile(path.abspath(options.output_file), 'w')
+	import tarfile
+	t_mode = 'w:gz' if options.gzip else 'w'
+	output_archive = tarfile.open(path.abspath(options.output_file), t_mode)
 	for name, arcname in git_files():
 		if options.verbose: print 'Compressing ' + arcname + '...'
 		output_archive.add(name, options.prefix + arcname)
+	output_archive.close()
+	
+	
