@@ -62,17 +62,12 @@ def main():
     git_repositary_path = path.abspath('')
     git_repositary_name = path.basename(git_repositary_path)
 
-    parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [--format FORMAT] [-v] [--prefix PREFIX]", version="%prog 1.0")
-
-    parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], 
-    					default='tar', 
-    					help="format of the resulting archive: tar or zip. The default output format is %default")
-    					
+    parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [-v] [--prefix PREFIX]", version="%prog 1.0")
+    
     parser.add_option('--prefix', type='string', dest='prefix', 
     					default='', help="prepend PREFIX to each filename in the archive")
     					
     parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
-    parser.add_option('-z', '--gzip', action='store_true', dest='gzip', help='if using tar format, use gzip compression')
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
     parser.add_option('--no-exclude', action='store_false', dest='exclude', 
@@ -85,20 +80,24 @@ def main():
     elif path.isdir(options.output_file):
         parser.error('You cannot use directory as output')
 
-    if options.format == 'zip':
-    	
-    	from zipfile import ZipFile, ZIP_DEFLATED
-    	output_archive = ZipFile(path.abspath(options.output_file), 'w')
+    _, _, format = options.output_file.rpartition(".")
 
-    elif options.format == 'tar':
-    	import tarfile
-    	t_mode = 'w:gz' if options.gzip else 'w'
-    	output_archive = tarfile.open(path.abspath(options.output_file), t_mode)
-    	
-	for name, arcname in git_files(git_repositary_path, options):
-		if options.verbose: print 'Compressing ' + arcname + '...'
-		output_archive.add(name, options.prefix + arcname)
-	output_archive.close()
+    if format == 'zip':
+        from zipfile import ZipFile, ZIP_DEFLATED
+        output_archive = ZipFile(path.abspath(options.output_file), 'w')
+
+    elif format.lower() in ['tar', 'bz2', 'gz']:
+        import tarfile
+        t_mode = ('w:%s' % format) if format != 'tar' else 'w'
+           
+        output_archive = tarfile.open(path.abspath(options.output_file), t_mode)
+    else:
+        raise RuntimeError("Unknown format: '%s'" % format)
+        
+    for name, arcname in git_files(git_repositary_path, options):
+        if options.verbose: print 'Compressing ' + arcname + '...'
+        output_archive.add(name, options.prefix + arcname)
+    output_archive.close()
 
 if __name__ == "__main__":
     main()
