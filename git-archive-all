@@ -60,35 +60,37 @@ def main():
     git_repositary_path = path.abspath('')
     git_repositary_name = path.basename(git_repositary_path)
 
-    parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [-v] [--prefix PREFIX]", version="%prog 1.0")
+    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.0")
     
     parser.add_option('--prefix', type='string', dest='prefix', 
                         default='', help="prepend PREFIX to each filename in the archive")
                         
-    parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
     parser.add_option('--no-exclude', action='store_false', dest='exclude', 
                         default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
                         
     options, args = parser.parse_args()
-
-    if options.output_file == '':
-        parser.error('You must specify output file')
-    elif path.isdir(options.output_file):
+    
+    if len(args) != 1:
+        parser.error('You must specify exactly one output file')
+    
+    (output_file,) = args
+    
+    if path.isdir(output_file):
         parser.error('You cannot use directory as output')
 
-    _, _, format = options.output_file.rpartition(".")
+    _, _, format = output_file.rpartition(".")
 
     if format == 'zip':
         from zipfile import ZipFile, ZIP_DEFLATED
-        output_archive = ZipFile(path.abspath(options.output_file), 'w')
+        output_archive = ZipFile(path.abspath(output_file), 'w')
 
     elif format.lower() in ['tar', 'bz2', 'gz']:
         import tarfile
         t_mode = ('w:%s' % format) if format != 'tar' else 'w'
            
-        output_archive = tarfile.open(path.abspath(options.output_file), t_mode)
+        output_archive = tarfile.open(path.abspath(output_file), t_mode)
     else:
         raise RuntimeError("Unknown format: '%s'" % format)
         
