@@ -58,7 +58,6 @@ def git_files(git_repositary_path, options, baselevel=''):
 
 def main():
     git_repositary_path = path.abspath('')
-    git_repositary_name = path.basename(git_repositary_path)
 
     parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.0")
     
