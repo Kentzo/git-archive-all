@@ -11,52 +11,50 @@ def run_shell(cmd):
 
 def git_files(git_repositary_path, options, baselevel=''):
 
-	excludes = []
+    excludes = []
 
-	for filepath in run_shell('git ls-files --cached --full-name --no-empty-directory'):
+    for filepath in run_shell('git ls-files --cached --full-name --no-empty-directory'):
+        fullpath = path.join(baselevel, filepath)
+        filename = path.basename(filepath)
+        
+        # right now every time we find a .gitattributes, we
+        # overwrite the previous patterns. might be nice to
+        # use a dictionary that retains the patterns on a 
+        # parent-path level. But this works fine for a top-level
+        # file in the main repo and top level of submodules
+        if options.exclude and filename == '.gitattributes':
+            excludes = []
+            fh = open(filepath, 'r')
+            for line in fh:
+                if not line: break
+                tokens = line.strip().split()
+                if 'export-ignore' in tokens[1:]:
+                    excludes.append(tokens[0])
+            fh.close()
 
-		fullpath = path.join(baselevel, filepath)
-		filename = path.basename(filepath)
-		
-		# right now every time we find a .gitattributes, we
-		# overwrite the previous patterns. might be nice to
-		# use a dictionary that retains the patterns on a 
-		# parent-path level. But this works fine for a top-level
-		# file in the main repo and top level of submodules
-		if options.exclude and filename == '.gitattributes':
-			excludes = []
-			fh = open(filepath, 'r')
-			for line in fh:
-				if not line: break
-				tokens = line.strip().split()
-				if 'export-ignore' in tokens[1:]:
-					excludes.append(tokens[0])
-			fh.close()
-
-		if not filename.startswith('.git') and not path.isdir(filepath):
-		
-			# check the patterns first
-			ignore = False
-			for pattern in excludes:
-				if fnmatch(filepath, pattern) or fnmatch(filename, pattern):
-					if options.verbose: print 'Exclude pattern matched (%s): %s' % (pattern, filepath)
-					ignore = True
-					break
-			if ignore:
-				continue
-			
-			# baselevel is needed to tell the arhiver where it have to extract file
-			yield filepath, fullpath
-	
-	# get paths for every submodule
-	for submodule in run_shell("git submodule --quiet foreach --recursive 'pwd'")
-		chdir(submodule)
-		# in order to get output path we need to exclude repository path from the submodule path
-		submodule = submodule[len(git_repositary_path)+1:]
-		# recursion allows us to process repositories with more than one level of submodules
-		for git_file in git_files(git_repositary_path, options, submodule):
-			yield git_file
-
+        if not filename.startswith('.git') and not path.isdir(filepath):
+        
+            # check the patterns first
+            ignore = False
+            for pattern in excludes:
+                if fnmatch(filepath, pattern) or fnmatch(filename, pattern):
+                    if options.verbose: print 'Exclude pattern matched (%s): %s' % (pattern, filepath)
+                    ignore = True
+                    break
+            if ignore:
+                continue
+            
+            # baselevel is needed to tell the arhiver where it have to extract file
+            yield filepath, fullpath
+    
+    # get paths for every submodule
+    for submodule in run_shell("git submodule --quiet foreach --recursive 'pwd'"):
+        chdir(submodule)
+        # in order to get output path we need to exclude repository path from the submodule path
+        submodule = submodule[len(git_repositary_path)+1:]
+        # recursion allows us to process repositories with more than one level of submodules
+        for git_file in git_files(git_repositary_path, options, submodule):
+            yield git_file
 
 def main():
     git_repositary_path = path.abspath('')
@@ -65,15 +63,15 @@ def main():
     parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [-v] [--prefix PREFIX]", version="%prog 1.0")
     
     parser.add_option('--prefix', type='string', dest='prefix', 
-    					default='', help="prepend PREFIX to each filename in the archive")
-    					
+                        default='', help="prepend PREFIX to each filename in the archive")
+                        
     parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
     parser.add_option('--no-exclude', action='store_false', dest='exclude', 
-    					default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
-    					
-    (options, args) = parser.parse_args()
+                        default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
+                        
+    options, args = parser.parse_args()
 
     if options.output_file == '':
         parser.error('You must specify output file')
