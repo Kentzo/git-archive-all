@@ -6,11 +6,14 @@ from optparse import OptionParser
 from sys import argv, stdout
 from fnmatch import fnmatch
 
+def run_shell(cmd):
+    return Popen(cmd, shell=True, stdout=PIPE).stdout.read().splitlines()
+
 def git_files(git_repositary_path, options, baselevel=''):
 
 	excludes = []
 
-	for filepath in Popen('git ls-files --cached --full-name --no-empty-directory', shell=True, stdout=PIPE).stdout.read().splitlines():
+	for filepath in run_shell('git ls-files --cached --full-name --no-empty-directory'):
 
 		fullpath = path.join(baselevel, filepath)
 		filename = path.basename(filepath)
@@ -46,7 +49,7 @@ def git_files(git_repositary_path, options, baselevel=''):
 			yield filepath, fullpath
 	
 	# get paths for every submodule
-	for submodule in Popen("git submodule --quiet foreach --recursive 'pwd'", shell=True, stdout=PIPE).stdout.read().splitlines():
+	for submodule in run_shell("git submodule --quiet foreach --recursive 'pwd'")
 		chdir(submodule)
 		# in order to get output path we need to exclude repository path from the submodule path
 		submodule = submodule[len(git_repositary_path)+1:]
