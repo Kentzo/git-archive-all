@@ -84,18 +84,20 @@ def main():
     if format.lower() == 'zip':
         from zipfile import ZipFile, ZIP_DEFLATED
         output_archive = ZipFile(path.abspath(output_file), 'w')
+        add = lambda name, arcname: output_archive.write(name, options.prefix + arcname, ZIP_DEFLATED)
 
     elif format.lower() in ['tar', 'bz2', 'gz']:
         import tarfile
         t_mode = ('w:%s' % format) if format != 'tar' else 'w'
            
         output_archive = tarfile.open(path.abspath(output_file), t_mode)
+        add = lambda name, arcname: output_archive.add(name, options.prefix + arcname)
     else:
         raise RuntimeError("Unknown format: '%s'" % format)
         
     for name, arcname in git_files(git_repositary_path, options):
         if options.verbose: print 'Compressing ' + arcname + '...'
-        output_archive.add(name, options.prefix + arcname)
+        add(name, arcname)
     output_archive.close()
 
 if __name__ == "__main__":
