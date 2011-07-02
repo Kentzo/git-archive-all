@@ -81,7 +81,7 @@ def main():
 
     _, _, format = output_file.rpartition(".")
 
-    if format == 'zip':
+    if format.lower() == 'zip':
         from zipfile import ZipFile, ZIP_DEFLATED
         output_archive = ZipFile(path.abspath(output_file), 'w')
 
