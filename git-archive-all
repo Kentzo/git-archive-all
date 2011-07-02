@@ -69,6 +69,10 @@ def main():
     parser.add_option('--no-exclude', action='store_false', dest='exclude', 
                         default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
                         
+    parser.add_option(
+        '--extra', action='append', dest='extra', default=[],
+        help="Any additional files to include in the archive.")
+
     options, args = parser.parse_args()
     
     if len(args) != 1:
@@ -95,6 +99,9 @@ def main():
     else:
         raise RuntimeError("Unknown format: '%s'" % format)
         
+    # extra files first (we may change folder later)
+    for name in options.extra:
+        add(name, name)
     for name, arcname in git_files(git_repositary_path, options):
         if options.verbose: print 'Compressing ' + arcname + '...'
         add(name, arcname)
