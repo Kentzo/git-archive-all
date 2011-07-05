@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 
 from os import path, chdir
 from subprocess import Popen, PIPE
@@ -6,94 +6,106 @@ from optparse import OptionParser
 from sys import argv, stdout
 from fnmatch import fnmatch
 
-git_repositary_path = path.abspath('')
-git_repositary_name = path.basename(git_repositary_path)
+def run_shell(cmd):
+    return Popen(cmd, shell=True, stdout=PIPE).stdout.read().splitlines()
 
-parser = OptionParser(usage="usage: %prog --output OUTPUT_FILE [--format FORMAT] [-v] [--prefix PREFIX]", version="%prog 1.0")
+def git_files(git_repositary_path, options, baselevel=''):
 
-parser.add_option('--format', type='choice', dest='format', choices=['zip','tar'], 
-					default='tar', 
-					help="format of the resulting archive: tar or zip. The default output format is %default")
-					
-parser.add_option('--prefix', type='string', dest='prefix', 
-					default='', help="prepend PREFIX to each filename in the archive")
-					
-parser.add_option('-o', '--output', type='string', dest='output_file', default='', help='output file')
-parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
+    excludes = []
 
-parser.add_option('--no-exclude', action='store_false', dest='exclude', 
-					default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
-					
-(options, args) = parser.parse_args()
+    for filepath in run_shell('git ls-files --cached --full-name --no-empty-directory'):
+        fullpath = path.join(baselevel, filepath)
+        filename = path.basename(filepath)
+        
+        # right now every time we find a .gitattributes, we
+        # overwrite the previous patterns. might be nice to
+        # use a dictionary that retains the patterns on a 
+        # parent-path level. But this works fine for a top-level
+        # file in the main repo and top level of submodules
+        if options.exclude and filename == '.gitattributes':
+            excludes = []
+            fh = open(filepath, 'r')
+            for line in fh:
+                if not line: break
+                tokens = line.strip().split()
+                if 'export-ignore' in tokens[1:]:
+                    excludes.append(tokens[0])
+            fh.close()
 
-if options.output_file == '':
-   parser.error('You must specify output file')
-elif path.isdir(options.output_file):
-   parser.error('You cannot use directory as output')
+        if not filename.startswith('.git') and not path.isdir(filepath):
+        
+            # check the patterns first
+            ignore = False
+            for pattern in excludes:
+                if fnmatch(filepath, pattern) or fnmatch(filename, pattern):
+                    if options.verbose: print 'Exclude pattern matched (%s): %s' % (pattern, filepath)
+                    ignore = True
+                    break
+            if ignore:
+                continue
+            
+            # baselevel is needed to tell the arhiver where it have to extract file
+            yield filepath, fullpath
+    
+    # get paths for every submodule
+    for submodule in run_shell("git submodule --quiet foreach 'pwd'"):
+        chdir(submodule)
+        # in order to get output path we need to exclude repository path from the submodule path
+        submodule = submodule[len(git_repositary_path)+1:]
+        # recursion allows us to process repositories with more than one level of submodules
+        for git_file in git_files(git_repositary_path, options, submodule):
+            yield git_file
 
-#print options.output_file
+def main():
+    git_repositary_path = path.abspath('')
 
+    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.0")
+    
+    parser.add_option('--prefix', type='string', dest='prefix', 
+                        default='', help="prepend PREFIX to each filename in the archive")
+                        
+    parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
-def git_files(baselevel=''):
+    parser.add_option('--no-exclude', action='store_false', dest='exclude', 
+                        default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
+                        
+    parser.add_option(
+        '--extra', action='append', dest='extra', default=[],
+        help="Any additional files to include in the archive.")
 
-	excludes = []
+    options, args = parser.parse_args()
+    
+    if len(args) != 1:
+        parser.error('You must specify exactly one output file')
+    
+    (output_file,) = args
+    
+    if path.isdir(output_file):
+        parser.error('You cannot use directory as output')
 
-	for filepath in Popen('git ls-files --cached --full-name --no-empty-directory', shell=True, stdout=PIPE).stdout.read().splitlines():
+    _, _, format = output_file.rpartition(".")
 
-		fullpath = path.join(baselevel, filepath)
-		filename = path.basename(filepath)
-		
-		# right now every time we find a .gitattributes, we
-		# overwrite the previous patterns. might be nice to
-		# use a dictionary that retains the patterns on a 
-		# parent-path level. But this works fine for a top-level
-		# file in the main repo and top level of submodules
-		if options.exclude and filename == '.gitattributes':
-			excludes = []
-			fh = open(filepath, 'r')
-			for line in fh:
-				if not line: break
-				tokens = line.strip().split()
-				if 'export-ignore' in tokens[1:]:
-					excludes.append(tokens[0])
-			fh.close()
+    if format.lower() == 'zip':
+        from zipfile import ZipFile, ZIP_DEFLATED
+        output_archive = ZipFile(path.abspath(output_file), 'w')
+        add = lambda name, arcname: output_archive.write(name, options.prefix + arcname, ZIP_DEFLATED)
 
-		if not filename.startswith('.git') and not path.isdir(filepath):
-		
-			# check the patterns first
-			ignore = False
-			for pattern in excludes:
-				if fnmatch(filepath, pattern) or fnmatch(filename, pattern):
-					if options.verbose: print 'Exclude pattern matched (%s): %s' % (pattern, filepath)
-					ignore = True
-					break
-			if ignore:
-				continue
-			
-			# baselevel is needed to tell the arhiver where it have to extract file
-			yield filepath, fullpath
-	
-	# get paths for every submodule
-	for submodule in Popen("git submodule --quiet foreach --recursive 'pwd'", shell=True, stdout=PIPE).stdout.read().splitlines():
-		chdir(submodule)
-		# in order to get output path we need to exclude repository path from the submodule path
-		submodule = submodule[len(git_repositary_path)+1:]
-		# recursion allows us to process repositories with more than one level of submodules
-		for git_file in git_files(submodule):
-			yield git_file
+    elif format.lower() in ['tar', 'bz2', 'gz']:
+        import tarfile
+        t_mode = ('w:%s' % format) if format != 'tar' else 'w'
+           
+        output_archive = tarfile.open(path.abspath(output_file), t_mode)
+        add = lambda name, arcname: output_archive.add(name, options.prefix + arcname)
+    else:
+        raise RuntimeError("Unknown format: '%s'" % format)
+        
+    # extra files first (we may change folder later)
+    for name in options.extra:
+        add(name, name)
+    for name, arcname in git_files(git_repositary_path, options):
+        if options.verbose: print 'Compressing ' + arcname + '...'
+        add(name, arcname)
+    output_archive.close()
 
-
-if options.format == 'zip':
-	
-	from zipfile import ZipFile, ZIP_DEFLATED
-	output_archive = ZipFile(path.abspath(options.output_file), 'w')
-	for name, arcname in git_files():
-		if options.verbose: print 'Compressing ' + arcname + '...'
-		output_archive.write(name, options.prefix + arcname, ZIP_DEFLATED)
-
-elif options.format == 'tar':
-	from tarfile import TarFile
-	output_archive = TarFile(path.abspath(options.output_file), 'w')
-	for name, arcname in git_files():
-		if options.verbose: print 'Compressing ' + arcname + '...'
-		output_archive.add(name, options.prefix + arcname)
+if __name__ == "__main__":
+    main()
