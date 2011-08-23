@@ -101,6 +101,7 @@ def main():
         
     # extra files first (we may change folder later)
     for name in options.extra:
+        if options.verbose: print 'Compressing ' + name + '...'
         add(name, name)
     for name, arcname in git_files(git_repositary_path, options):
         if options.verbose: print 'Compressing ' + arcname + '...'
