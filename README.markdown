@@ -1,5 +1,7 @@
 Creates archive from the current state using `git ls-files --cached --full-name --no-empty-directory`. Supports for any level of submodules tree. Files from submodules are extracted using the same command.
 
+*License:* MIT
+
 *Usage:* git-archive-all.py [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE
 
 *Options:*
@@ -13,4 +15,3 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   **-v, --verbose**         enable verbose mode
 
   **--no-exclude**         Dont read .gitattributes files for patterns containing export-ignore attrib
-
