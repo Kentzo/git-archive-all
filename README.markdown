@@ -2,7 +2,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
 
 *License:* MIT
 
-*Usage:* git-archive-all [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE
+*Usage:* git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] OUTPUT_FILE
 
 *Options:*
 
