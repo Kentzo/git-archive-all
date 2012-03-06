@@ -11,6 +11,8 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   **-h, --help**            show this help message and exit
   
   **--prefix=PREFIX**       prepend PREFIX to each filename in the archive
+
+  **--force-submodules**    Force a git submodule init && git submodule update at each level before iterating submodules
   
   **-v, --verbose**         enable verbose mode
 

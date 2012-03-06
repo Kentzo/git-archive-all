@@ -18,11 +18,12 @@ class GitArchiver(object):
     Automatically detects output format extension: zip, tar, bz2, or gz
     """
     
-    def __init__(self, prefix='', verbose=False, exclude=True, extra=[]):
+    def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=[]):
         self.prefix    = prefix
         self.verbose   = verbose
         self.exclude   = exclude
         self.extra     = extra
+        self.force_sub = force_sub
         
         self._excludes = []
 
@@ -115,6 +116,10 @@ class GitArchiver(object):
                 # baselevel is needed to tell the arhiver where it have to extract file
                 yield filepath, fullpath
         
+        if self.force_sub :
+          self.runShell("git submodule init")
+          self.runShell("git submodule update")
+
         # get paths for every submodule
         for submodule in self.runShell("git submodule --quiet foreach 'pwd'"):
             chdir(submodule)
@@ -143,8 +148,11 @@ if __name__ == "__main__":
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
 
     parser.add_option('--no-exclude', action='store_false', dest='exclude', 
-                      default=True, help="Dont read .gitattributes files for patterns containing export-ignore attrib")
-                        
+                      default=True, help="Don't read .gitattributes files for patterns containing export-ignore attrib")
+
+    parser.add_option('--force-submodules', action='store_true', dest='force_sub',
+                      help="Force a git submodule init && git submodule update at each level before iterating submodules.")
+
     parser.add_option('--extra', action='append', dest='extra', default=[], 
                       help="Any additional files to include in the archive.")
 
@@ -161,6 +169,7 @@ if __name__ == "__main__":
     archiver = GitArchiver(options.prefix, 
                            options.verbose, 
                            options.exclude,
+                           options.force_sub,
                            options.extra)
     
     try:
