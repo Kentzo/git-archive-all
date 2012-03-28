@@ -33,7 +33,7 @@ class GitArchiver(object):
         create(str output_file) -> None
         
         Creates the archive, written to the given output_file
-        Filetype may be one of:  gz, zip, bz2, tar
+        Filetype may be one of:  gz, zip, bz2, tar, tgz
         """
         #
         # determine the format
@@ -45,9 +45,15 @@ class GitArchiver(object):
             output_archive = ZipFile(path.abspath(output_file), 'w')
             add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
     
-        elif format.lower() in ['tar', 'bz2', 'gz']:
+        elif format.lower() in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
-            t_mode = ('w:%s' % format) if format != 'tar' else 'w'
+
+            if format == 'tar':
+                t_mode = 'w'
+            elif format == 'tgz':
+                t_mode = 'w:gz'
+            else:
+                t_mode = ('w:%s' % format)
                
             output_archive = tarfile.open(path.abspath(output_file), t_mode)
             add = lambda name, arcname: output_archive.add(name, self.prefix + arcname)
