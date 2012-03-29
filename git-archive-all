@@ -39,13 +39,14 @@ class GitArchiver(object):
         # determine the format
         #
         _, _, format = output_file.rpartition(".")
+        format = format.lower()
 
-        if format.lower() == 'zip':
+        if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
             output_archive = ZipFile(path.abspath(output_file), 'w')
             add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
     
-        elif format.lower() in ['tar', 'bz2', 'gz', 'tgz']:
+        elif format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
 
             if format == 'tar':
