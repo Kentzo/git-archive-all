@@ -95,6 +95,7 @@ class GitArchiver(object):
         Recurses into submodules as well.
         """
         for filepath in self.runShell('git ls-files --cached --full-name --no-empty-directory'):
+            filepath = filepath.decode('string_escape').strip('"')
             fullpath = path.join(baselevel, filepath)
             filename = path.basename(filepath)
             
@@ -147,7 +148,7 @@ class GitArchiver(object):
 if __name__ == "__main__":
     from optparse import OptionParser
 
-    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.2")
+    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.3")
     
     parser.add_option('--prefix', type='string', dest='prefix', 
                       default='', help="prepend PREFIX to each filename in the archive")
