@@ -148,7 +148,7 @@ class GitArchiver(object):
 if __name__ == "__main__":
     from optparse import OptionParser
 
-    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.2")
+    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE", version="%prog 1.3")
     
     parser.add_option('--prefix', type='string', dest='prefix', 
                       default='', help="prepend PREFIX to each filename in the archive")
