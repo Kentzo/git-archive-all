@@ -108,8 +108,10 @@ class GitArchiver(object):
                     if 'export-ignore' in tokens[1:]:
                         self._excludes.append(tokens[0])
                 fh.close()
-    
-            if not filename.startswith('.git') and not path.isdir(filepath):
+
+            # Only list symlinks and files that don't start with git
+            if not filename.startswith('.git') \
+               and (path.islink(filepath) or not path.isdir(filepath)):
             
                 # check the patterns first
                 ignore = False
