@@ -26,22 +26,22 @@ class GitArchiver(object):
 
         self._excludes = []
 
-    def create(self, output_file):
+    def create(self, output_filepath):
         """
-        create(str output_file) -> None
+        create(str output_filepath) -> None
 
-        Creates the archive, written to the given output_file
+        Creates the archive, written to the given output_filepath
         Filetype may be one of:  gz, zip, bz2, tar, tgz
         """
         #
         # determine the format
         #
-        _, _, format = output_file.rpartition(".")
+        _, _, format = output_filepath.rpartition(".")
         format = format.lower()
 
         if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
-            output_archive = ZipFile(path.abspath(output_file), 'w')
+            output_archive = ZipFile(path.abspath(output_filepath), 'w')
             add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
 
         elif format in ['tar', 'bz2', 'gz', 'tgz']:
@@ -54,7 +54,7 @@ class GitArchiver(object):
             else:
                 t_mode = ('w:%s' % format)
 
-            output_archive = tarfile.open(path.abspath(output_file), t_mode)
+            output_archive = tarfile.open(path.abspath(output_filepath), t_mode)
             add = lambda name, arcname: output_archive.add(name, self.prefix + arcname)
         else:
             raise RuntimeError("Unknown format: '%s'" % format)
@@ -66,16 +66,16 @@ class GitArchiver(object):
         # extra files first (we may change folder later)
         for name in self.extra:
             if self.verbose:
-                toPath = '=> %s%s' % (self.prefix, name) if self.prefix else ""
-                print 'Compressing %s %s ...' % (name, toPath)
+                to_path = '=> %s%s' % (self.prefix, name) if self.prefix else ""
+                print 'Compressing %s %s ...' % (name, to_path)
             add(name, name)
 
         self._excludes = []
 
         for name, arcname in self.listFiles(path.abspath('')):
             if self.verbose:
-                toPath = '=> %s%s' % (self.prefix, arcname) if self.prefix else ""
-                print 'Compressing %s %s ...' % (arcname, toPath)
+                to_path = '=> %s%s' % (self.prefix, arcname) if self.prefix else ""
+                print 'Compressing %s %s ...' % (arcname, to_path)
             add(name, arcname)
 
         output_archive.close()
@@ -151,10 +151,10 @@ if __name__ == "__main__":
     parser.add_option('--prefix', type='string', dest='prefix',
                       default='', help="prepend PREFIX to each filename in the archive")
 
-    parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='enable verbose mode')
+    parser.add_option('-v', '--verbose', action='store_true', dest='verbose', help='Enable verbose mode.')
 
     parser.add_option('--no-exclude', action='store_false', dest='exclude',
-                      default=True, help="Don't read .gitattributes files for patterns containing export-ignore attrib")
+                      default=True, help="Don't read .gitattributes files for patterns containing export-ignore attrib.")
 
     parser.add_option('--force-submodules', action='store_true', dest='force_sub',
                       help="Force a git submodule init && git submodule update at each level before iterating submodules.")
@@ -167,9 +167,9 @@ if __name__ == "__main__":
     if len(args) != 1:
         parser.error('You must specify exactly one output file')
 
-    outFile = args[0]
+    output_filepath = args[0]
 
-    if path.isdir(outFile):
+    if path.isdir(output_filepath):
         parser.error('You cannot use directory as output')
 
     archiver = GitArchiver(options.prefix,
@@ -179,7 +179,7 @@ if __name__ == "__main__":
                            options.extra)
 
     try:
-        archiver.create(outFile)
+        archiver.create(output_filepath)
     except Exception, e:
         parser.exit(2, "%s\n" % e)
 
