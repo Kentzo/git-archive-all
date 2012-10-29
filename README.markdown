@@ -6,14 +6,14 @@ Creates archive from the current state using `git ls-files --cached --full-name 
 
 *Options:*
 
-  **--version**             show program's version number and exit
+  **--version**             Show program's version number and exit.
   
-  **-h, --help**            show this help message and exit
+  **-h, --help**            Show this help message and exit.
   
-  **--prefix=PREFIX**       prepend PREFIX to each filename in the archive
+  **--prefix=PREFIX**       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.
 
   **--force-submodules**    Force a git submodule init && git submodule update at each level before iterating submodules
   
-  **-v, --verbose**         enable verbose mode
+  **-v, --verbose**         Enable verbose mode.
 
-  **--no-exclude**         Dont read .gitattributes files for patterns containing export-ignore attrib
+  **--no-exclude**          Don't read .gitattributes files for patterns containing export-ignore attributes.
