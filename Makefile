@@ -1,5 +1,5 @@
 prefix=/usr/local
-BIN=git-archive-all
+EXEC_FILES=git-archive-all
 
 all:
 	@echo "usage: make install"
@@ -7,9 +7,9 @@ all:
 
 install:
 	install -d -m 0755 $(prefix)/bin
-	install -m 0755 $(BIN) $(prefix)/bin
+	install -m 0755 $(EXEC_FILES) $(prefix)/bin
 
 uninstall:
 	test -d $(prefix)/bin && \
 	cd $(prefix)/bin && \
-	rm -f ${BIN}
+	rm -f ${EXEC_FILES}
