@@ -1,12 +1,15 @@
-PREFIX ?= /usr/local
-BIN = git-archive-all
+PREFIX=/usr/local
+BIN=git-archive-all
+
+all:
+	@echo "usage: make install"
+	@echo "       make uninstall"
 
 install:
-	@echo "... installing to $(PREFIX)/bin"
-	chmod +x $(BIN)
-	cp -f $(BIN) $(PREFIX)/bin
+	install -d -m 0755 $(prefix)/bin
+	install -m 0755 $(BIN) $(prefix)/bin
 
 uninstall:
-	rm -f $(PREFIX)/bin/$(BIN)
-
-.PHONY: install uninstall
+	test -d $(prefix)/bin && \
+	cd $(prefix)/bin && \
+	rm -f ${BIN}
