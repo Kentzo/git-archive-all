@@ -1,4 +1,4 @@
-PREFIX=/usr/local
+prefix=/usr/local
 BIN=git-archive-all
 
 all:
