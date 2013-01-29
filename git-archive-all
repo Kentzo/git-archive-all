@@ -82,20 +82,27 @@ class GitArchiver(object):
 
         output_archive.close()
 
-    def list_files(self, git_repositary_path, baselevel=''):
+    def list_files(self, git_main_repo_path, git_repo_submodule_path=''):
         """
-        list_files(str git_repository_path, str baselevel='') -> iterator
-
         An iterator method that yields a tuple(filepath, fullpath)
         for each file that should be included in the archive.
         Skips those that match the exclusion patterns found in
         any discovered .gitattributes files along the way.
 
         Recurses into submodules as well.
+
+        @type git_main_repo_path:   string
+        @param git_main_repo_path:  Path to the main git repository.
+
+        @type git_repo_submodule_path:  string
+        @param git_repo_submodule_path: Path to the submodule relative to git_main_repo_path.
+
+        @rtype:     iterator
+        @return:    Iterator to traverse git files in git_main_repo_path.
         """
         for filepath in self.run_shell('git ls-files --cached --full-name --no-empty-directory'):
             filepath = filepath.decode('string_escape').strip('"')
-            fullpath = path.join(baselevel, filepath)
+            fullpath = path.join(git_repo_submodule_path, filepath)
             filename = path.basename(filepath)
 
             if self.exclude and filename == '.gitattributes':
@@ -135,9 +142,9 @@ class GitArchiver(object):
         for submodule in self.run_shell("git submodule --quiet foreach 'pwd'"):
             chdir(submodule)
             # in order to get output path we need to exclude repository path from the submodule path
-            submodule = submodule[len(git_repositary_path) + 1:]
+            submodule = submodule[len(git_main_repo_path) + 1:]
             # recursion allows us to process repositories with more than one level of submodules
-            for git_file in self.list_files(git_repositary_path, submodule):
+            for git_file in self.list_files(git_main_repo_path, submodule):
                 yield git_file
 
     @staticmethod
