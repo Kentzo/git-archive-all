@@ -5,7 +5,6 @@ __version__ = "1.4.2"
 import sys
 from os import path, chdir
 from subprocess import Popen, PIPE
-from fnmatch import fnmatch
 
 
 class GitArchiver(object):
@@ -26,24 +25,22 @@ class GitArchiver(object):
         self.extra = extra
         self.force_sub = force_sub
 
-        self._excludes = []
-
-    def create(self, output_filepath):
+    def create(self, output_file_path):
         """
-        create(str output_filepath) -> None
+        create(str output_file_path) -> None
 
-        Creates the archive, written to the given output_filepath
+        Creates the archive, written to the given output_file_path
         Filetype may be one of:  gz, zip, bz2, tar, tgz
         """
         #
         # determine the format
         #
-        _, _, format = output_filepath.rpartition(".")
+        _, _, format = output_file_path.rpartition(".")
         format = format.lower()
 
         if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
-            output_archive = ZipFile(path.abspath(output_filepath), 'w')
+            output_archive = ZipFile(path.abspath(output_file_path), 'w')
             add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
 
         elif format in ['tar', 'bz2', 'gz', 'tgz']:
@@ -56,7 +53,7 @@ class GitArchiver(object):
             else:
                 t_mode = ('w:%s' % format)
 
-            output_archive = tarfile.open(path.abspath(output_filepath), t_mode)
+            output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
             add = lambda name, arcname: output_archive.add(name, self.prefix + arcname)
         else:
             raise RuntimeError("Unknown format: '%s'" % format)
@@ -72,8 +69,6 @@ class GitArchiver(object):
                 print 'Compressing %s %s ...' % (name, to_path)
             add(name, name)
 
-        self._excludes = []
-
         for name, arcname in self.list_files(path.abspath('')):
             if self.verbose:
                 to_path = '=> %s%s' % (self.prefix, arcname) if self.prefix else ""
@@ -82,9 +77,23 @@ class GitArchiver(object):
 
         output_archive.close()
 
-    def list_files(self, git_main_repo_path, git_repo_submodule_path=''):
+    def get_exclude_patterns(self, get_repo_path):
+        patterns = []
+        attributes_path = path.join(get_repo_path, '.gitattributes')
+        if path.isfile(attributes_path):
+            attributes_file = open(attributes_path, 'r')
+            for line in attributes_file:
+                if not line:
+                    break
+                tokens = line.strip().split()
+                if 'export-ignore' in tokens[1:]:
+                    patterns.append(tokens[0])
+            attributes_file.close()
+        return patterns
+
+    def list_files(self, git_main_repo_path, git_submodule_repo_path=''):
         """
-        An iterator method that yields a tuple(filepath, fullpath)
+        An iterator method that yields a tuple(file_path, full_file_path)
         for each file that should be included in the archive.
         Skips those that match the exclusion patterns found in
         any discovered .gitattributes files along the way.
@@ -94,58 +103,55 @@ class GitArchiver(object):
         @type git_main_repo_path:   string
         @param git_main_repo_path:  Path to the main git repository.
 
-        @type git_repo_submodule_path:  string
-        @param git_repo_submodule_path: Path to the submodule relative to git_main_repo_path.
+        @type git_submodule_repo_path:  string
+        @param git_submodule_repo_path: Path to the submodule relative to git_main_repo_path.
 
         @rtype:     iterator
-        @return:    Iterator to traverse git files in git_main_repo_path.
+        @return:    Iterator to traverse tuples representing files in the git repo.
+                    The tuple consist of file_path (relative to the cwd) and full_file_path (relative to git_main_repo_path)
         """
-        for filepath in self.run_shell('git ls-files --cached --full-name --no-empty-directory'):
-            filepath = filepath.decode('string_escape').strip('"')
-            fullpath = path.join(git_repo_submodule_path, filepath)
-            filename = path.basename(filepath)
+        if self.exclude:
+            exclude_patterns = self.get_exclude_patterns(path.join(git_main_repo_path, git_submodule_repo_path))
+        else:
+            exclude_patterns = []
 
-            if self.exclude and filename == '.gitattributes':
-                self._excludes = []
-                fh = open(filepath, 'r')
-                for line in fh:
-                    if not line:
-                        break
-                    tokens = line.strip().split()
-                    if 'export-ignore' in tokens[1:]:
-                        self._excludes.append(tokens[0])
-                fh.close()
+        for file_path in self.run_shell('git ls-files --cached --full-name --no-empty-directory'):
+            file_path = file_path.decode('string_escape').strip('"')  # file path relative to current repo
+            file_name = path.basename(file_path)
 
-            # Only list symlinks and files that don't start with git
-            if not filename.startswith('.git') \
-               and (path.islink(filepath) or not path.isdir(filepath)):
+            # Only list symlinks and files that don't start with git.
+            if file_name.startswith('.git') or (not path.islink(file_path) and path.isdir(file_path)):
+                continue
 
-                # check the patterns first
-                ignore = False
-                for pattern in self._excludes:
-                    if fnmatch(fullpath, pattern) or fnmatch(filename, pattern):
-                        if self.verbose:
-                            print 'Exclude pattern matched (%s): %s' % (pattern, fullpath)
-                        ignore = True
-                        break
-                if ignore:
-                    continue
+            full_file_path = path.join(git_submodule_repo_path, file_path)  # file path relative to the main repo
 
-                # baselevel is needed to tell the arhiver where it have to extract file
-                yield filepath, fullpath
+            # Check the exclude patterns first.
+            ignore = False
+            for pattern in exclude_patterns:
+                from fnmatch import fnmatch
+
+                if fnmatch(full_file_path, pattern) or fnmatch(file_name, pattern):
+                    if self.verbose:
+                        print 'Exclude pattern matched (%s): %s' % (pattern, full_file_path)
+                    ignore = True
+                    break
+            if ignore:
+                continue
+
+            # Yield both file_path and full_file_path to preserve structure of the repo.
+            yield file_path, full_file_path
 
         if self.force_sub:
             self.run_shell("git submodule init")
             self.run_shell("git submodule update")
 
-        # get paths for every submodule
-        for submodule in self.run_shell("git submodule --quiet foreach 'pwd'"):
-            chdir(submodule)
-            # in order to get output path we need to exclude repository path from the submodule path
-            submodule = submodule[len(git_main_repo_path) + 1:]
-            # recursion allows us to process repositories with more than one level of submodules
-            for git_file in self.list_files(git_main_repo_path, submodule):
-                yield git_file
+        # List files of every submodule.
+        for submodule_path in self.run_shell("git submodule --quiet foreach 'pwd'"):
+            chdir(submodule_path)
+            # In order to get output path we need to exclude repository path from submodule_path.
+            submodule_path = path.relpath(submodule_path, git_main_repo_path)
+            for file_tuple in self.list_files(git_main_repo_path, submodule_path):
+                yield file_tuple
 
     @staticmethod
     def run_shell(cmd):
@@ -177,9 +183,9 @@ if __name__ == "__main__":
     if len(args) != 1:
         parser.error('You must specify exactly one output file')
 
-    output_filepath = args[0]
+    output_file_path = args[0]
 
-    if path.isdir(output_filepath):
+    if path.isdir(output_file_path):
         parser.error('You cannot use directory as output')
 
     # avoid tarbomb
@@ -187,7 +193,7 @@ if __name__ == "__main__":
         options.prefix = path.join(options.prefix, '')
     else:
         import re
-        output_name = path.basename(output_filepath)
+        output_name = path.basename(output_file_path)
         output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or 'archive'
         options.prefix = path.join(output_name, '')
 
@@ -198,7 +204,7 @@ if __name__ == "__main__":
                            options.extra)
 
     try:
-        archiver.create(output_filepath)
+        archiver.create(output_file_path)
     except Exception, e:
         parser.exit(2, "%s\n" % e)
 
