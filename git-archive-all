@@ -74,7 +74,7 @@ class GitArchiver(object):
 
         self._excludes = []
 
-        for name, arcname in self.listFiles(path.abspath('')):
+        for name, arcname in self.list_files(path.abspath('')):
             if self.verbose:
                 to_path = '=> %s%s' % (self.prefix, arcname) if self.prefix else ""
                 print 'Compressing %s %s ...' % (arcname, to_path)
@@ -82,9 +82,9 @@ class GitArchiver(object):
 
         output_archive.close()
 
-    def listFiles(self, git_repositary_path, baselevel=''):
+    def list_files(self, git_repositary_path, baselevel=''):
         """
-        listFiles(str git_repository_path, str baselevel='') -> iterator
+        list_files(str git_repository_path, str baselevel='') -> iterator
 
         An iterator method that yields a tuple(filepath, fullpath)
         for each file that should be included in the archive.
@@ -93,7 +93,7 @@ class GitArchiver(object):
 
         Recurses into submodules as well.
         """
-        for filepath in self.runShell('git ls-files --cached --full-name --no-empty-directory'):
+        for filepath in self.run_shell('git ls-files --cached --full-name --no-empty-directory'):
             filepath = filepath.decode('string_escape').strip('"')
             fullpath = path.join(baselevel, filepath)
             filename = path.basename(filepath)
@@ -128,20 +128,20 @@ class GitArchiver(object):
                 yield filepath, fullpath
 
         if self.force_sub:
-            self.runShell("git submodule init")
-            self.runShell("git submodule update")
+            self.run_shell("git submodule init")
+            self.run_shell("git submodule update")
 
         # get paths for every submodule
-        for submodule in self.runShell("git submodule --quiet foreach 'pwd'"):
+        for submodule in self.run_shell("git submodule --quiet foreach 'pwd'"):
             chdir(submodule)
             # in order to get output path we need to exclude repository path from the submodule path
             submodule = submodule[len(git_repositary_path) + 1:]
             # recursion allows us to process repositories with more than one level of submodules
-            for git_file in self.listFiles(git_repositary_path, submodule):
+            for git_file in self.list_files(git_repositary_path, submodule):
                 yield git_file
 
     @staticmethod
-    def runShell(cmd):
+    def run_shell(cmd):
         return Popen(cmd, shell=True, stdout=PIPE).stdout.read().splitlines()
 
 
