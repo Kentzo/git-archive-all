@@ -100,7 +100,7 @@ class GitArchiver(object):
         Skips those that match the exclusion patterns found in
         any discovered .gitattributes files along the way.
 
-        Recurses into submodules as well.
+        Recurs into submodules as well.
 
         @type git_main_repo_path:   string
         @param git_main_repo_path:  Path to the main git repository.
