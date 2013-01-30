@@ -19,30 +19,21 @@ class GitArchiver(object):
     Automatically detects output format extension: zip, tar, bz2, or gz.
     """
 
-    def __init__(self, prefix=None, verbose=False, exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+    def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
         if extra is None:
             extra = []
 
         if main_repo_abspath is None:
-            self.main_repo_abspath = path.abspath('')
+            main_repo_abspath = path.abspath('')
         elif not path.isabs(main_repo_abspath):
             raise ValueError("You MUST pass absolute path to the main git repository.")
-        else:
-            self.main_repo_abspath = main_repo_abspath
-
-        if prefix is None:
-            prefix = ''
 
         self.prefix = prefix
         self.verbose = verbose
+        self.exclude = exclude
         self.extra = extra
         self.force_sub = force_sub
-
-        if exclude:
-            self.exclude_patterns = {}
-            self.add_exclude_patterns()
-        else:
-            self.exclude_patterns = None
+        self.main_repo_abspath = main_repo_abspath
 
     def create(self, output_file_path):
         """
@@ -106,93 +97,85 @@ class GitArchiver(object):
         for file_path, arc_file_path in self.list_files():
             print "{file_path} => {arc_file_path}".format(file_path=file_path, arc_file_path=path.join(self.prefix, arc_file_path))
 
-    def get_path_components(self, abspath):
+    def get_path_components(self, repo_abspath, abspath):
         """
+        Splits given abspath into components until repo_abspath is reached.
         """
         components = []
-        while abspath != self.main_repo_abspath:
+        while not path.samefile(abspath, repo_abspath):
             abspath, tail = path.split(abspath)
-            components.insert(0, tail)
-        components.insert(0, path.relpath(self.main_repo_abspath, self.main_repo_abspath))
+            if len(tail):
+                components.insert(0, tail)
+        components.insert(0, path.relpath(repo_abspath, repo_abspath))
         return components
 
-    def get_exclude_patterns(self, attributes_abspath):
+    def get_exclude_patterns(self, repo_abspath, repo_file_paths):
         """
-        Returns exclude patterns from a given attributes file or empty list if file does not exist or has no patterns.
-
-        @type attributes_abspath:   string
-        @param attributes_abspath:  Absolute path to git attributes files.
-
-        @rtype:     list
-        @return     Returns list of exclude patterns.
+        Returns exclude patterns for a given repo.
+        It looks for .gitattributes files in repo_file_paths.
         """
-        patterns = []
+        if not self.exclude:
+            return None
 
-        if path.isfile(attributes_abspath):
-            attributes = open(attributes_abspath, 'r').readlines()
+        def read_attributes(attributes_abspath):
             patterns = []
-            for line in attributes:
-                tokens = line.strip().split()
-                if 'export-ignore' in tokens[1:]:
-                    patterns.append(tokens[0])
+            if path.isfile(attributes_abspath):
+                attributes = open(attributes_abspath, 'r').readlines()
+                patterns = []
+                for line in attributes:
+                    tokens = line.strip().split()
+                    if 'export-ignore' in tokens[1:]:
+                        patterns.append(tokens[0])
+            return patterns
 
-        return patterns
+        exclude_patterns = {}
 
-    def add_exclude_patterns(self):
-        """
-        Adds all exclude patterns for a given repository.
-
-        Walks through all directories and reads all git attributes files.
-        """
         global_attributes_abspath = self.run_shell('git config --get core.attributesfile').rstrip()
-        self.exclude_patterns[()] = self.get_exclude_patterns(global_attributes_abspath)
+        exclude_patterns[()] = read_attributes(global_attributes_abspath)
 
-        def visit(arg, dir_abspath, names):
-            if path.basename(dir_abspath) == '.git':
-                local_attributes_abspath = path.join(dir_abspath, '.git', 'info', 'attributes')
-                patterns = self.get_exclude_patterns(local_attributes_abspath)
-                # Local attributes should be treated as whole-repo attributes
-                key = tuple(self.get_path_components(path.split(dir_abspath)[0]))
-                # The root repo is already visited, so value for the key already exists.
-                self.exclude_patterns[key].extend(patterns)
-                # There is no reason to visit directories inside .git
-                del names[:]
-            else:
-                patterns = self.get_exclude_patterns(path.join(dir_abspath, '.gitattributes'))
-                key = tuple(self.get_path_components(dir_abspath))
-                self.exclude_patterns[key] = patterns
+        for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith('.gitattributes')]:
+            key = tuple(self.get_path_components(repo_abspath, path.dirname(attributes_abspath)))
+            exclude_patterns[key] = read_attributes(attributes_abspath)
 
-        path.walk(self.main_repo_abspath, visit, None)
+        local_attributes_abspath = path.join(repo_abspath, '.git', 'info', 'attributes')
+        key = tuple(self.get_path_components(repo_abspath, repo_abspath))
+        if key in exclude_patterns:
+            exclude_patterns[key].extend(read_attributes(local_attributes_abspath))
+        else:
+            exclude_patterns[key] = read_attributes(local_attributes_abspath)
 
-    def is_file_excluded(self, main_repo_file_path):
+        return exclude_patterns
+
+    def is_file_excluded(self, repo_abspath, repo_file_path, exclude_patterns):
         """
         Checks whether file at a given path is excluded.
 
-        @type main_repo_file_path: string
-        @param main_repo_file_path: Relative path to a file within the main git repository.
+        @type repo_file_path: string
+        @param repo_file_path: Relative path to a file within the main git repository.
 
         @rtype: bool
         @return: True if file should be excluded. Otherwise False.
         """
-        if self.exclude_patterns is None:
+        if exclude_patterns is None or not len(exclude_patterns):
             return False
 
         from fnmatch import fnmatch
 
-        file_name = path.basename(main_repo_file_path)
-        components = self.get_path_components(path.dirname(path.join(self.main_repo_abspath, main_repo_file_path)))
+        file_name = path.basename(repo_file_path)
+        components = self.get_path_components(repo_abspath, path.join(repo_abspath, path.dirname(repo_file_path)))
 
         is_excluded = False
         # We should check all patterns specified in intermediate directories to the given file.
         # At the end we should also check for the global patterns (key '()' or empty tuple).
         while not is_excluded:
             key = tuple(components)
-            patterns = self.exclude_patterns[key]
-            for p in patterns:
-                if fnmatch(file_name, p) or fnmatch(main_repo_file_path, p):
-                    if self.verbose:
-                        print 'Exclude pattern matched (%s): %s' % (p, main_repo_file_path)
-                    is_excluded = True
+            if key in exclude_patterns:
+                patterns = exclude_patterns[key]
+                for p in patterns:
+                    if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
+                        if self.verbose:
+                            print 'Exclude pattern matched (%s): %s' % (p, repo_file_path)
+                        is_excluded = True
 
             if not len(components):
                 break
@@ -218,7 +201,12 @@ class GitArchiver(object):
         @return:    Iterator to traverse tuples representing files in the git repo.
                     The tuple consist of repo_file_path (relative to the cwd) and main_repo_file_path (relative to main_repo_abspath)
         """
-        for repo_file_path in self.run_shell('git ls-files --cached --full-name --no-empty-directory').splitlines():
+
+        repo_abspath = path.join(self.main_repo_abspath, repo_path)
+        repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory').splitlines()
+        exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
+
+        for repo_file_path in repo_file_paths:
             repo_file_path = repo_file_path.decode('string_escape').strip('"')  # file path relative to current repo
             file_name = path.basename(repo_file_path)
 
@@ -228,7 +216,7 @@ class GitArchiver(object):
 
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
-            if self.is_file_excluded(main_repo_file_path):
+            if self.is_file_excluded(repo_abspath, repo_file_path, exclude_patterns):
                 continue
 
             # Yield both repo_file_path and main_repo_file_path to preserve structure of the repo.
