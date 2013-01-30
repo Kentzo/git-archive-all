@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 # coding=utf-8
 
-__version__ = "1.4.3"
+__version__ = "1.5"
 
 import sys
-from os import path, chdir
+from os import path
 from subprocess import Popen, PIPE
 
 
@@ -20,6 +20,27 @@ class GitArchiver(object):
     """
 
     def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+        """
+        @type prefix:   string
+        @param prefix:  Prefix used to prepend all paths in the resulting archive.
+
+        @type verbose:  bool
+        @param verbose: Determines verbosity of the output (stdout).
+
+        @type exclude:  bool
+        @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
+                        Defaults to True.
+
+        @type force_sub:    bool
+        @param force_sub:   Determines whether submodules are initialized and updated before archiving.
+                            Defaults to False
+
+        @type extra:    list
+        @param extra:   List of extra paths to include in the resulting archive.
+
+        @type main_repo_abspath:    string
+        @param main_repo_abspath:   Absolute path to the main repository. If None, current cwd is used.
+        """
         if extra is None:
             extra = []
 
@@ -100,6 +121,21 @@ class GitArchiver(object):
     def get_path_components(self, repo_abspath, abspath):
         """
         Splits given abspath into components until repo_abspath is reached.
+
+        E.g. if repo_abspath is '/Documents/Hobby/ParaView/' and abspath is
+        '/Documents/Hobby/ParaView/Catalyst/Editions/Base/', function will return:
+        ['.', 'Catalyst', 'Editions', 'Base']
+
+        First element is always '.' (concrete symbol depends on OS).
+
+        @type repo_abspath:     string
+        @param repo_abspath:    Absolute path to the git repository.
+
+        @type abspath:  string
+        @param abspath: Absolute path to within repo_abspath.
+
+        @rtype:     list
+        @return:    List of path components.
         """
         components = []
         while not path.samefile(abspath, repo_abspath):
@@ -111,8 +147,21 @@ class GitArchiver(object):
 
     def get_exclude_patterns(self, repo_abspath, repo_file_paths):
         """
-        Returns exclude patterns for a given repo.
-        It looks for .gitattributes files in repo_file_paths.
+        Returns exclude patterns for a given repo. It looks for .gitattributes files in repo_file_paths.
+
+        Resulting dictionary will contain exclude patterns per path (relative to the repo_abspath).
+        E.g. {('.', 'Catalyst', 'Editions', 'Base'), ['Foo*', '*Bar']}
+
+        @type repo_abspath:     string
+        @param repo_abspath:    Absolute path to the git repository.
+
+        @type repo_file_paths:  list
+        @param repo_file_paths: List of paths relative to the repo_abspath that are under git control.
+
+        @rtype:         dict
+        @return:    Dictionary representing exclude patterns.
+                    Keys are tuples of strings. Values are lists of strings.
+                    Returns None if self.exclude is not set.
         """
         if not self.exclude:
             return None
@@ -134,6 +183,7 @@ class GitArchiver(object):
         exclude_patterns[()] = read_attributes(global_attributes_abspath)
 
         for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith('.gitattributes')]:
+            # Each .gitattributes affects only files within its directory.
             key = tuple(self.get_path_components(repo_abspath, path.dirname(attributes_abspath)))
             exclude_patterns[key] = read_attributes(attributes_abspath)
 
@@ -150,8 +200,14 @@ class GitArchiver(object):
         """
         Checks whether file at a given path is excluded.
 
-        @type repo_file_path: string
-        @param repo_file_path: Relative path to a file within the main git repository.
+        @type repo_abspath: string
+        @param repo_abspath: Absolute path to the git repository.
+
+        @type repo_file_path:   string
+        @param repo_file_path:  Path to a file within repo_abspath.
+
+        @type exclude_patterns:     dict
+        @param exclude_patterns:    Exclude patterns with format specified for get_exclude_patterns.
 
         @rtype: bool
         @return: True if file should be excluded. Otherwise False.
@@ -184,7 +240,6 @@ class GitArchiver(object):
 
         return is_excluded
 
-
     def list_files(self, repo_path=''):
         """
         An iterator method that yields a tuple(repo_file_path, main_repo_file_path)
@@ -201,7 +256,6 @@ class GitArchiver(object):
         @return:    Iterator to traverse tuples representing files in the git repo.
                     The tuple consist of repo_file_path (relative to the cwd) and main_repo_file_path (relative to main_repo_abspath)
         """
-
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
