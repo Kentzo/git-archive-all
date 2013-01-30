@@ -18,7 +18,9 @@ class GitArchiver(object):
     Automatically detects output format extension: zip, tar, bz2, or gz
     """
 
-    def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=[]):
+    def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=None):
+        if extra is None:
+            extra = []
         self.prefix = prefix
         self.verbose = verbose
         self.exclude = exclude
