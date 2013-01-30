@@ -130,7 +130,7 @@ class GitArchiver(object):
 
         exclude_patterns = {}
 
-        global_attributes_abspath = self.run_shell('git config --get core.attributesfile').rstrip()
+        global_attributes_abspath = self.run_shell('git config --get core.attributesfile', repo_abspath).rstrip()
         exclude_patterns[()] = read_attributes(global_attributes_abspath)
 
         for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith('.gitattributes')]:
@@ -203,7 +203,7 @@ class GitArchiver(object):
         """
 
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory').splitlines()
+        repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
@@ -223,19 +223,18 @@ class GitArchiver(object):
             yield repo_file_path, main_repo_file_path
 
         if self.force_sub:
-            self.run_shell("git submodule init")
-            self.run_shell("git submodule update")
+            self.run_shell("git submodule init", repo_abspath)
+            self.run_shell("git submodule update", repo_abspath)
 
         # List files of every submodule.
-        for submodule_path in self.run_shell("git submodule --quiet foreach 'pwd'").splitlines():
-            chdir(submodule_path)
+        for submodule_path in self.run_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
             # In order to get output path we need to exclude repository path from submodule_path.
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
             for path_tuple in self.list_files(submodule_path):
                 yield path_tuple
 
     @staticmethod
-    def run_shell(cmd):
+    def run_shell(cmd, cwd=None):
         """
         Runs shell command and returns the output.
 
@@ -245,7 +244,7 @@ class GitArchiver(object):
         @rtype:     string
         @return:    String representing command output.
         """
-        return Popen(cmd, shell=True, stdout=PIPE).stdout.read()
+        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read()
 
 
 if __name__ == "__main__":
