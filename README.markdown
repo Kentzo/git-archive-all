@@ -17,3 +17,5 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   **-v, --verbose**         Enable verbose mode.
 
   **--no-exclude**          Don't read .gitattributes files for patterns containing export-ignore attributes.
+
+  **--dry-run**             Don't actually archive anything, just show what would be done.
