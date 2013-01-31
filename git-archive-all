@@ -337,7 +337,7 @@ if __name__ == "__main__":
     parser.add_option('--dry-run',
         action='store_true',
         dest='dry_run',
-        help="Don’t actually archive anything, just show what would be done.")
+        help="Don't actually archive anything, just show what would be done.")
 
     options, args = parser.parse_args()
 
