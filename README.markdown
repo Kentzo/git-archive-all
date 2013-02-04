@@ -2,7 +2,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
 
 *License:* MIT
 
-*Usage:* git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] OUTPUT_FILE
+*Usage:* `git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--dry-run] OUTPUT_FILE`
 
 *Options:*
 
@@ -12,7 +12,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   
   **--prefix=PREFIX**       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.
 
-  **--force-submodules**    Force a git submodule init && git submodule update at each level before iterating submodules
+  **--force-submodules**    Force a `git submodule init && git submodule update` at each level before iterating submodules
   
   **-v, --verbose**         Enable verbose mode.
 
