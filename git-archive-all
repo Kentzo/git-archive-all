@@ -72,7 +72,7 @@ class GitArchiver(object):
         if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
             output_archive = ZipFile(path.abspath(output_file_path), 'w')
-            add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
+            add = lambda name, arcname: output_archive.write(arcname, self.prefix + arcname, ZIP_DEFLATED)
 
         elif format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
@@ -85,7 +85,7 @@ class GitArchiver(object):
                 t_mode = ('w:%s' % format)
 
             output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
-            add = lambda name, arcname: output_archive.add(name, self.prefix + arcname)
+            add = lambda name, arcname: output_archive.add(arcname, self.prefix + arcname)
         else:
             raise RuntimeError("Unknown format: '%s'" % format)
 
