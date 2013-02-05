@@ -4,7 +4,7 @@
 __version__ = "1.5"
 
 import sys
-from os import path
+from os import path, extsep
 from subprocess import Popen, PIPE
 
 
@@ -56,24 +56,31 @@ class GitArchiver(object):
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
 
-    def create(self, output_file_path):
+    def create(self, output_file_path, dry_run=False, format=None):
         """
-        create(str output_file_path) -> None
-
         Creates the archive, written to the given output_file_path
-        Filetype may be one of:  gz, zip, bz2, tar, tgz
+
+        Type of the archive is determined either by extension of output_file_path or by the format argument.
+        Supported formats are: gz, zip, bz2, tar, tgz
+
+        @type output_file_path:     string
+        @param output_file_path:    Output file path.
+
+        @type dry_run:  bool
+        @param dry_run: Determines whether create should do nothing but print what it would archive.
+
+        @type format:   string
+        @param format:  Determines format of the output archive. If None, format is determined from extension.
         """
-        #
-        # determine the format
-        #
-        _, _, format = output_file_path.rpartition(".")
-        format = format.lower()
+        if format is None:
+            file_name, file_ext = path.splitext(output_file_path)
+            format = file_ext[len(extsep):].lower()
 
         if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
-            output_archive = ZipFile(path.abspath(output_file_path), 'w')
-            add = lambda name, arcname: output_archive.write(name, self.prefix + arcname, ZIP_DEFLATED)
 
+            output_archive = ZipFile(path.abspath(output_file_path), 'w')
+            add = lambda file_path, file_name: output_archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
         elif format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
 
@@ -82,41 +89,30 @@ class GitArchiver(object):
             elif format == 'tgz':
                 t_mode = 'w:gz'
             else:
-                t_mode = ('w:%s' % format)
+                t_mode = 'w:{f}'.format(f=format)
 
             output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
-            add = lambda name, arcname: output_archive.add(name, self.prefix + arcname)
+            add = lambda file_path, file_name: output_archive.add(file_path, path.join(self.prefix, file_name))
         else:
-            raise RuntimeError("Unknown format: '%s'" % format)
+            raise RuntimeError("Unknown format: {f}".format(f=format))
 
-        #
-        # compress
-        #
+        for file_path in self.extra:
+            if not dry_run:
+                if self.verbose:
+                    print "Compressing {f} => {a}...".format(f=file_path, a=path.join(self.prefix, file_path))
+                add(file_path, file_path)
+            else:
+                print "{f} => {a}".format(f=file_path, a=path.join(self.prefix, file_path))
 
-        # extra files first (we may change folder later)
-        for name in self.extra:
-            if self.verbose:
-                to_path = '=> %s%s' % (self.prefix, name) if self.prefix else ""
-                print 'Compressing %s %s ...' % (name, to_path)
-            add(name, name)
-
-        for name, arcname in self.list_files():
-            if self.verbose:
-                to_path = '=> %s%s' % (self.prefix, arcname) if self.prefix else ""
-                print 'Compressing %s %s ...' % (arcname, to_path)
-            add(name, arcname)
+        for file_path in self.list_files():
+            if not dry_run:
+                if self.verbose:
+                    print "Compressing {f} => {a}...".format(f=path.join(self.main_repo_abspath, file_path), a=path.join(self.prefix, file_path))
+                add(path.join(self.main_repo_abspath, file_path), file_path)
+            else:
+                print "{f} => {a}".format(f=path.join(self.main_repo_abspath, file_path), a=path.join(self.prefix, file_path))
 
         output_archive.close()
-
-    def dry_run(self):
-        """
-        Does nothing but prints what would be done.
-        """
-        for file_path in self.extra:
-            print "{file_path} => {arc_file_path}".format(file_path=file_path, arc_file_path=path.join(self.prefix, file_path))
-
-        for file_path, arc_file_path in self.list_files():
-            print "{file_path} => {arc_file_path}".format(file_path=file_path, arc_file_path=path.join(self.prefix, arc_file_path))
 
     def get_path_components(self, repo_abspath, abspath):
         """
@@ -242,7 +238,7 @@ class GitArchiver(object):
 
     def list_files(self, repo_path=''):
         """
-        An iterator method that yields a tuple(repo_file_path, main_repo_file_path)
+        An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive.
         Skips those that match the exclusion patterns found in
         any discovered .gitattributes files along the way.
@@ -253,8 +249,7 @@ class GitArchiver(object):
         @param repo_path:   Path to the git submodule repository within the main git repository.
 
         @rtype:     iterator
-        @return:    Iterator to traverse tuples representing files in the git repo.
-                    The tuple consist of repo_file_path (relative to the cwd) and main_repo_file_path (relative to main_repo_abspath)
+        @return:    Iterator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath).splitlines()
@@ -274,7 +269,7 @@ class GitArchiver(object):
                 continue
 
             # Yield both repo_file_path and main_repo_file_path to preserve structure of the repo.
-            yield repo_file_path, main_repo_file_path
+            yield main_repo_file_path
 
         if self.force_sub:
             self.run_shell("git submodule init", repo_abspath)
@@ -284,8 +279,8 @@ class GitArchiver(object):
         for submodule_path in self.run_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
             # In order to get output path we need to exclude repository path from submodule_path.
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
-            for path_tuple in self.list_files(submodule_path):
-                yield path_tuple
+            for file_path in self.list_files(submodule_path):
+                yield file_path
 
     @staticmethod
     def run_shell(cmd, cwd=None):
@@ -365,10 +360,7 @@ if __name__ == "__main__":
                            options.extra)
 
     try:
-        if not options.dry_run:
-            archiver.create(output_file_path)
-        else:
-            archiver.dry_run()
+        archiver.create(output_file_path, options.dry_run)
     except Exception, e:
         parser.exit(2, "%s\n" % e)
 
