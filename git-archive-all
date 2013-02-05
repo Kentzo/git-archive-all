@@ -226,7 +226,7 @@ class GitArchiver(object):
                 for p in patterns:
                     if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
                         if self.verbose:
-                            print 'Exclude pattern matched (%s): %s' % (p, repo_file_path)
+                            print 'Exclude pattern matched {pattern}: {path}'.format(pattern=p, path=repo_file_path)
                         is_excluded = True
 
             if not len(components):
@@ -362,6 +362,6 @@ if __name__ == "__main__":
     try:
         archiver.create(output_file_path, options.dry_run)
     except Exception, e:
-        parser.exit(2, "%s\n" % e)
+        parser.exit(2, "{exception}\n".format(exception=e))
 
     sys.exit(0)
