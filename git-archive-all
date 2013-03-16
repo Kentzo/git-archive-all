@@ -84,8 +84,8 @@ class GitArchiver(object):
             from zipfile import ZipFile, ZIP_DEFLATED
 
             if not dry_run:
-                output_archive = ZipFile(path.abspath(output_path), 'w')
-                add = lambda file_path, file_name: output_archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
+                archive = ZipFile(path.abspath(output_path), 'w')
+                add = lambda file_path, file_name: archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
         elif output_format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
 
@@ -97,8 +97,8 @@ class GitArchiver(object):
                 t_mode = 'w:{f}'.format(f=output_format)
 
             if not dry_run:
-                output_archive = tarfile.open(path.abspath(output_path), t_mode)
-                add = lambda file_path, file_name: output_archive.add(file_path, path.join(self.prefix, file_name))
+                archive = tarfile.open(path.abspath(output_path), t_mode)
+                add = lambda file_path, file_name: archive.add(file_path, path.join(self.prefix, file_name))
         else:
             raise RuntimeError("Unknown format: {f}".format(f=output_format))
 
@@ -123,7 +123,7 @@ class GitArchiver(object):
                                           a=path.join(self.prefix, file_path)))
 
         if not dry_run:
-            output_archive.close()
+            archive.close()
 
     def get_path_components(self, repo_abspath, abspath):
         """
@@ -183,21 +183,21 @@ class GitArchiver(object):
                 patterns = []
                 for line in attributes:
                     tokens = line.strip().split()
-                    if 'export-ignore' in tokens[1:]:
+                    if "export-ignore" in tokens[1:]:
                         patterns.append(tokens[0])
             return patterns
 
         exclude_patterns = {}
 
-        global_attributes_abspath = self.read_shell('git config --get core.attributesfile', repo_abspath).rstrip()
+        global_attributes_abspath = self.read_shell("git config --get core.attributesfile", repo_abspath).rstrip()
         exclude_patterns[()] = read_attributes(global_attributes_abspath)
 
-        for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith('.gitattributes')]:
+        for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith(".gitattributes")]:
             # Each .gitattributes affects only files within its directory.
             key = tuple(self.get_path_components(repo_abspath, path.dirname(attributes_abspath)))
             exclude_patterns[key] = read_attributes(attributes_abspath)
 
-        local_attributes_abspath = path.join(repo_abspath, '.git', 'info', 'attributes')
+        local_attributes_abspath = path.join(repo_abspath, ".git", "info", "attributes")
         key = tuple(self.get_path_components(repo_abspath, repo_abspath))
 
         if key in exclude_patterns:
@@ -276,7 +276,7 @@ class GitArchiver(object):
             file_name = path.basename(repo_file_path)
 
             # Only list symlinks and files that don't start with git.
-            if file_name.startswith('.git') or (not path.islink(repo_file_path) and path.isdir(repo_file_path)):
+            if file_name.startswith(".git") or (not path.islink(repo_file_path) and path.isdir(repo_file_path)):
                 continue
 
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
@@ -391,12 +391,12 @@ if __name__ == '__main__':
     options, args = parser.parse_args()
 
     if len(args) != 1:
-        parser.error('You must specify exactly one output file')
+        parser.error("You must specify exactly one output file")
 
     output_file_path = args[0]
 
     if path.isdir(output_file_path):
-        parser.error('You cannot use directory as output')
+        parser.error("You cannot use directory as output")
 
     # avoid tarbomb
     if options.prefix:
@@ -405,7 +405,7 @@ if __name__ == '__main__':
         import re
 
         output_name = path.basename(output_file_path)
-        output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or 'Archive'
+        output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or "Archive"
         options.prefix = path.join(output_name, '')
 
     archiver = GitArchiver(options.prefix,
