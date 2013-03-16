@@ -79,8 +79,9 @@ class GitArchiver(object):
         if format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
 
-            output_archive = ZipFile(path.abspath(output_file_path), 'w')
-            add = lambda file_path, file_name: output_archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
+            if not dry_run:
+                output_archive = ZipFile(path.abspath(output_file_path), 'w')
+                add = lambda file_path, file_name: output_archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
         elif format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
 
@@ -91,8 +92,9 @@ class GitArchiver(object):
             else:
                 t_mode = 'w:{f}'.format(f=format)
 
-            output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
-            add = lambda file_path, file_name: output_archive.add(file_path, path.join(self.prefix, file_name))
+            if not dry_run:
+                output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
+                add = lambda file_path, file_name: output_archive.add(file_path, path.join(self.prefix, file_name))
         else:
             raise RuntimeError("Unknown format: {f}".format(f=format))
 
@@ -112,7 +114,8 @@ class GitArchiver(object):
             else:
                 print "{f} => {a}".format(f=path.join(self.main_repo_abspath, file_path), a=path.join(self.prefix, file_path))
 
-        output_archive.close()
+        if not dry_run:
+            output_archive.close()
 
     def get_path_components(self, repo_abspath, abspath):
         """
