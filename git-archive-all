@@ -59,63 +59,68 @@ class GitArchiver(object):
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
 
-    def create(self, output_file_path, dry_run=False, format=None):
+    def create(self, output_path, dry_run=False, output_format=None):
         """
         Creates the archive, written to the given output_file_path
 
         Type of the archive is determined either by extension of output_file_path or by the format argument.
         Supported formats are: gz, zip, bz2, tar, tgz
 
-        @type output_file_path:     string
-        @param output_file_path:    Output file path.
+        @type output_path:     string
+        @param output_path:    Output file path.
 
         @type dry_run:  bool
         @param dry_run: Determines whether create should do nothing but print what it would archive.
 
-        @type format:   string
-        @param format:  Determines format of the output archive. If None, format is determined from extension.
+        @type output_format:   string
+        @param output_format:  Determines format of the output archive.
+                                    If None, format is determined from extension of output_file_path.
         """
-        if format is None:
-            file_name, file_ext = path.splitext(output_file_path)
-            format = file_ext[len(extsep):].lower()
+        if output_format is None:
+            file_name, file_ext = path.splitext(output_path)
+            output_format = file_ext[len(extsep):].lower()
 
-        if format == 'zip':
+        if output_format == 'zip':
             from zipfile import ZipFile, ZIP_DEFLATED
 
             if not dry_run:
-                output_archive = ZipFile(path.abspath(output_file_path), 'w')
+                output_archive = ZipFile(path.abspath(output_path), 'w')
                 add = lambda file_path, file_name: output_archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
-        elif format in ['tar', 'bz2', 'gz', 'tgz']:
+        elif output_format in ['tar', 'bz2', 'gz', 'tgz']:
             import tarfile
 
-            if format == 'tar':
+            if output_format == 'tar':
                 t_mode = 'w'
-            elif format == 'tgz':
+            elif output_format == 'tgz':
                 t_mode = 'w:gz'
             else:
-                t_mode = 'w:{f}'.format(f=format)
+                t_mode = 'w:{f}'.format(f=output_format)
 
             if not dry_run:
-                output_archive = tarfile.open(path.abspath(output_file_path), t_mode)
+                output_archive = tarfile.open(path.abspath(output_path), t_mode)
                 add = lambda file_path, file_name: output_archive.add(file_path, path.join(self.prefix, file_name))
         else:
-            raise RuntimeError("Unknown format: {f}".format(f=format))
+            raise RuntimeError("Unknown format: {f}".format(f=output_format))
 
         for file_path in self.extra:
             if not dry_run:
                 if self.verbose:
-                    print("Compressing {f} => {a}...".format(f=file_path, a=path.join(self.prefix, file_path)))
+                    print("Compressing {f} => {a}...".format(f=file_path,
+                                                             a=path.join(self.prefix, file_path)))
                 add(file_path, file_path)
             else:
-                print("{f} => {a}".format(f=file_path, a=path.join(self.prefix, file_path)))
+                print("{f} => {a}".format(f=file_path,
+                                          a=path.join(self.prefix, file_path)))
 
         for file_path in self.list_files():
             if not dry_run:
                 if self.verbose:
-                    print("Compressing {f} => {a}...".format(f=path.join(self.main_repo_abspath, file_path), a=path.join(self.prefix, file_path)))
+                    print("Compressing {f} => {a}...".format(f=path.join(self.main_repo_abspath, file_path),
+                                                             a=path.join(self.prefix, file_path)))
                 add(path.join(self.main_repo_abspath, file_path), file_path)
             else:
-                print("{f} => {a}".format(f=path.join(self.main_repo_abspath, file_path), a=path.join(self.prefix, file_path)))
+                print("{f} => {a}".format(f=path.join(self.main_repo_abspath, file_path),
+                                          a=path.join(self.prefix, file_path)))
 
         if not dry_run:
             output_archive.close()
@@ -140,10 +145,13 @@ class GitArchiver(object):
         @return:    List of path components.
         """
         components = []
+
         while not path.samefile(abspath, repo_abspath):
             abspath, tail = path.split(abspath)
+
             if len(tail):
                 components.insert(0, tail)
+
         components.insert(0, path.relpath(repo_abspath, repo_abspath))
         return components
 
@@ -191,6 +199,7 @@ class GitArchiver(object):
 
         local_attributes_abspath = path.join(repo_abspath, '.git', 'info', 'attributes')
         key = tuple(self.get_path_components(repo_abspath, repo_abspath))
+
         if key in exclude_patterns:
             exclude_patterns[key].extend(read_attributes(local_attributes_abspath))
         else:
@@ -258,7 +267,8 @@ class GitArchiver(object):
         @return:    Iterator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.decode_git_output(self.read_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath)).splitlines()
+        repo_file_paths = self.decode_git_output(
+            self.read_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath)).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
@@ -335,43 +345,43 @@ class GitArchiver(object):
         return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from optparse import OptionParser
 
     parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--dry-run] OUTPUT_FILE",
-        version="%prog {version}".format(version=__version__))
+                          version="%prog {version}".format(version=__version__))
 
     parser.add_option('--prefix',
-        type='string',
-        dest='prefix',
-        default='',
-        help="Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.")
+                      type='string',
+                      dest='prefix',
+                      default='',
+                      help="Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.")
 
     parser.add_option('-v', '--verbose',
-        action='store_true',
-        dest='verbose',
-        help='Enable verbose mode.')
+                      action='store_true',
+                      dest='verbose',
+                      help='Enable verbose mode.')
 
     parser.add_option('--no-exclude',
-        action='store_false',
-        dest='exclude',
-        default=True,
-        help="Don't read .gitattributes files for patterns containing export-ignore attrib.")
+                      action='store_false',
+                      dest='exclude',
+                      default=True,
+                      help="Don't read .gitattributes files for patterns containing export-ignore attrib.")
 
     parser.add_option('--force-submodules',
-        action='store_true',
-        dest='force_sub',
-        help="Force a git submodule init && git submodule update at each level before iterating submodules.")
+                      action='store_true',
+                      dest='force_sub',
+                      help="Force a git submodule init && git submodule update at each level before iterating submodules.")
 
     parser.add_option('--extra',
-        action='append',
-        dest='extra',
-        default=[],
-        help="Any additional files to include in the archive.")
+                      action='append',
+                      dest='extra',
+                      default=[],
+                      help="Any additional files to include in the archive.")
     parser.add_option('--dry-run',
-        action='store_true',
-        dest='dry_run',
-        help="Don't actually archive anything, just show what would be done.")
+                      action='store_true',
+                      dest='dry_run',
+                      help="Don't actually archive anything, just show what would be done.")
 
     options, args = parser.parse_args()
 
@@ -388,6 +398,7 @@ if __name__ == "__main__":
         options.prefix = path.join(options.prefix, '')
     else:
         import re
+
         output_name = path.basename(output_file_path)
         output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or 'Archive'
         options.prefix = path.join(output_name, '')
