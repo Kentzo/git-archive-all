@@ -267,8 +267,7 @@ class GitArchiver(object):
         @return:    Iterator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.decode_git_output(
-            self.read_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath)).splitlines()
+        repo_file_paths = self.read_git_shell("git ls-files --cached --full-name --no-empty-directory", repo_abspath).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
@@ -316,7 +315,7 @@ class GitArchiver(object):
         return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).wait()
 
     @staticmethod
-    def read_shell(cmd, cwd=None):
+    def read_shell(cmd, cwd=None, encoding='utf-8'):
         """
         Runs shell command and reads output.
 
@@ -326,23 +325,29 @@ class GitArchiver(object):
         @type cwd:  string
         @param cwd: Working directory.
 
-        @rtype:     bytes
+        @type encoding: string
+        @param encoding: Encoding used to decode bytes returns by Popen into string.
+
+        @rtype:     string
         @return:    Output of the command.
         """
-        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read()
+        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read().decode(encoding)
 
     @staticmethod
-    def decode_git_output(output):
+    def read_git_shell(cmd, cwd=None):
         """
-        Decodes output of the git command into unicode string.
+        Runs git shell command, reads output and decodes it into unicode string
 
-        @type output:   bytes
-        @param output:  Output of the git shell command.
+        @type cmd:  string
+        @param cmd: Command to be executed.
 
-        @rtype:         string
-        @return:        UTF-8 representation of the output.
+        @type cwd:  string
+        @param cwd: Working directory.
+
+        @rtype:     string
+        @return:    Output of the command.
         """
-        return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read().decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
 
 if __name__ == '__main__':
