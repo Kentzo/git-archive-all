@@ -299,7 +299,7 @@ class GitArchiver(object):
 if __name__ == "__main__":
     from optparse import OptionParser
 
-    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] OUTPUT_FILE",
+    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--dry-run] OUTPUT_FILE",
         version="%prog {version}".format(version=__version__))
 
     parser.add_option('--prefix',
