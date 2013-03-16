@@ -361,7 +361,7 @@ if __name__ == "__main__":
 
     try:
         archiver.create(output_file_path, options.dry_run)
-    except Exception, e:
+    except Exception as e:
         parser.exit(2, "{exception}\n".format(exception=e))
 
     sys.exit(0)
