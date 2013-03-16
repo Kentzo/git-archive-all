@@ -181,7 +181,7 @@ class GitArchiver(object):
 
         exclude_patterns = {}
 
-        global_attributes_abspath = self.run_shell('git config --get core.attributesfile', repo_abspath).rstrip()
+        global_attributes_abspath = self.read_shell('git config --get core.attributesfile', repo_abspath).rstrip()
         exclude_patterns[()] = read_attributes(global_attributes_abspath)
 
         for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith('.gitattributes')]:
@@ -258,11 +258,12 @@ class GitArchiver(object):
         @return:    Iterator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.run_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath).splitlines()
+        repo_file_paths = self.decode_git_output(self.read_shell('git ls-files --cached --full-name --no-empty-directory', repo_abspath)).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
-            repo_file_path = repo_file_path.decode('string_escape').strip('"')  # file path relative to current repo
+            # Git puts path in quotes if file path has unicode characters.
+            repo_file_path = repo_file_path.strip('"')  # file path relative to current repo
             file_name = path.basename(repo_file_path)
 
             # Only list symlinks and files that don't start with git.
@@ -282,7 +283,7 @@ class GitArchiver(object):
             self.run_shell("git submodule update", repo_abspath)
 
         # List files of every submodule.
-        for submodule_path in self.run_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
+        for submodule_path in self.read_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
             # In order to get output path we need to exclude repository path from submodule_path.
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
             for file_path in self.list_files(submodule_path):
@@ -291,15 +292,47 @@ class GitArchiver(object):
     @staticmethod
     def run_shell(cmd, cwd=None):
         """
-        Runs shell command and returns the output.
+        Runs shell command.
 
         @type cmd:  string
         @param cmd: Command to be executed.
 
-        @rtype:     string
-        @return:    String representing command output.
+        @type cwd:  string
+        @param cwd: Working directory.
+
+        @rtype:     int
+        @return:    Return code of the command.
+        """
+        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).wait()
+
+    @staticmethod
+    def read_shell(cmd, cwd=None):
+        """
+        Runs shell command and reads output.
+
+        @type cmd:  string
+        @param cmd: Command to be executed.
+
+        @type cwd:  string
+        @param cwd: Working directory.
+
+        @rtype:     bytes
+        @return:    Output of the command.
         """
         return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read()
+
+    @staticmethod
+    def decode_git_output(output):
+        """
+        Decodes output of the git command into unicode string.
+
+        @type output:   bytes
+        @param output:  Output of the git shell command.
+
+        @rtype:         string
+        @return:        UTF-8 representation of the output.
+        """
+        return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
 
 if __name__ == "__main__":
