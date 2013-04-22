@@ -312,7 +312,7 @@ class GitArchiver(object):
         @rtype:     int
         @return:    Return code of the command.
         """
-        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).wait()
+        return Popen(cmd, shell=True, cwd=cwd).wait()
 
     @staticmethod
     def read_shell(cmd, cwd=None, encoding='utf-8'):
