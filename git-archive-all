@@ -42,7 +42,10 @@ class GitArchiver(object):
         @param extra:   List of extra paths to include in the resulting archive.
 
         @type main_repo_abspath:    string
-        @param main_repo_abspath:   Absolute path to the main repository. If None, current cwd is used.
+        @param main_repo_abspath:   Absolute path to the main repository (or one of subdirectories).
+                                    If None, current cwd is used.
+                                    If given path is path to a subdirectory (but not a submodule directory!)
+                                    it will be replaced with abspath to toplevel directory of the repository.
         """
         if extra is None:
             extra = []
@@ -57,6 +60,9 @@ class GitArchiver(object):
             self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
         except Exception as e:
             raise ValueError("Not a git repository (or any of the parent directories).".format(path=main_repo_abspath))
+
+        # Detect toplevel directory of the repo.
+        main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
 
         self.prefix = prefix
         self.verbose = verbose
