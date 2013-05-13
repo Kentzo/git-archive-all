@@ -199,10 +199,15 @@ class GitArchiver(object):
                         patterns.append(tokens[0])
             return patterns
 
-        exclude_patterns = {}
+        exclude_patterns = {(): []}
 
-        global_attributes_abspath = self.read_shell("git config --get core.attributesfile", repo_abspath).rstrip()
-        exclude_patterns[()] = read_attributes(global_attributes_abspath)
+        # There may be no gitattributes.
+        try:
+            global_attributes_abspath = self.read_shell("git config --get core.attributesfile", repo_abspath).rstrip()
+            exclude_patterns[()] = read_attributes(global_attributes_abspath)
+        except:
+            # And valid to not have them.
+            pass
 
         for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith(".gitattributes")]:
             # Each .gitattributes affects only files within its directory.
