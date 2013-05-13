@@ -8,7 +8,7 @@ __version__ = "1.6.1"
 
 import sys
 from os import path, extsep
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, CalledProcessError
 
 
 class GitArchiver(object):
@@ -52,6 +52,12 @@ class GitArchiver(object):
         elif not path.isabs(main_repo_abspath):
             raise ValueError("You MUST pass absolute path to the main git repository.")
 
+        # Raises an exception if there is no repo under main_repo_abspath.
+        try:
+            self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
+        except Exception as e:
+            raise ValueError("Not a git repository (or any of the parent directories).".format(path=main_repo_abspath))
+
         self.prefix = prefix
         self.verbose = verbose
         self.exclude = exclude
@@ -72,9 +78,9 @@ class GitArchiver(object):
         @type dry_run:  bool
         @param dry_run: Determines whether create should do nothing but print what it would archive.
 
-        @type output_format:   string
-        @param output_format:  Determines format of the output archive.
-                                    If None, format is determined from extension of output_file_path.
+        @type output_format:    string
+        @param output_format:   Determines format of the output archive.
+                                If None, format is determined from extension of output_file_path.
         """
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
@@ -311,8 +317,16 @@ class GitArchiver(object):
 
         @rtype:     int
         @return:    Return code of the command.
+
+        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
-        return Popen(cmd, shell=True, cwd=cwd).wait()
+        p = Popen(cmd, shell=True, cwd=cwd)
+        p.wait()
+
+        if p.returncode:
+            raise CalledProcessError(returncode=p.returncode, cmd=cmd)
+
+        return p.returncode
 
     @staticmethod
     def read_shell(cmd, cwd=None, encoding='utf-8'):
@@ -326,12 +340,21 @@ class GitArchiver(object):
         @param cwd: Working directory.
 
         @type encoding: string
-        @param encoding: Encoding used to decode bytes returns by Popen into string.
+        @param encoding: Encoding used to decode bytes returned by Popen into string.
 
         @rtype:     string
         @return:    Output of the command.
+
+        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
-        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read().decode(encoding)
+        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
+        output, _ = p.communicate()
+        output = output.decode(encoding)
+
+        if p.returncode:
+            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+
+        return output
 
     @staticmethod
     def read_git_shell(cmd, cwd=None):
@@ -346,8 +369,17 @@ class GitArchiver(object):
 
         @rtype:     string
         @return:    Output of the command.
+
+        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
-        return Popen(cmd, shell=True, stdout=PIPE, cwd=cwd).stdout.read().decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
+        output, _ = p.communicate()
+        output = output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+
+        if p.returncode:
+            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+
+        return output
 
 
 if __name__ == '__main__':
@@ -408,13 +440,12 @@ if __name__ == '__main__':
         output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or "Archive"
         options.prefix = path.join(output_name, '')
 
-    archiver = GitArchiver(options.prefix,
-                           options.verbose,
-                           options.exclude,
-                           options.force_sub,
-                           options.extra)
-
     try:
+        archiver = GitArchiver(options.prefix,
+                               options.verbose,
+                               options.exclude,
+                               options.force_sub,
+                               options.extra)
         archiver.create(output_file_path, options.dry_run)
     except Exception as e:
         parser.exit(2, "{exception}\n".format(exception=e))
