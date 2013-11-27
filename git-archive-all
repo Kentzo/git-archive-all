@@ -6,9 +6,11 @@ from __future__ import unicode_literals
 
 __version__ = "1.7"
 
+from os import extsep, path, readlink
+from subprocess import CalledProcessError, Popen, PIPE
 import sys
-from os import path, extsep
-from subprocess import Popen, PIPE, CalledProcessError
+import tarfile
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 
 class GitArchiver(object):
@@ -92,47 +94,40 @@ class GitArchiver(object):
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
 
-        if output_format == 'zip':
-            from zipfile import ZipFile, ZIP_DEFLATED
-
-            if not dry_run:
+        if not dry_run:
+            if output_format == 'zip':
                 archive = ZipFile(path.abspath(output_path), 'w')
-                add = lambda file_path, file_name: archive.write(file_path, path.join(self.prefix, file_name), ZIP_DEFLATED)
-        elif output_format in ['tar', 'bz2', 'gz', 'tgz']:
-            import tarfile
 
-            if output_format == 'tar':
-                t_mode = 'w'
-            elif output_format == 'tgz':
-                t_mode = 'w:gz'
-            else:
-                t_mode = 'w:{f}'.format(f=output_format)
+                def add_file(file_path, arcname):
+                    if not path.islink(file_path):
+                        archive.write(file_path, path.join(self.prefix, arcname), ZIP_DEFLATED)
+                    else:
+                        i = ZipInfo(path.join(self.prefix, arcname))
+                        i.create_system = 3
+                        i.external_attr = 0xA1ED0000
+                        archive.writestr(i, readlink(file_path))
+            elif output_format in ['tar', 'bz2', 'gz', 'tgz']:
+                if output_format == 'tar':
+                    t_mode = 'w'
+                elif output_format == 'tgz':
+                    t_mode = 'w:gz'
+                else:
+                    t_mode = 'w:{0}'.format(output_format)
 
-            if not dry_run:
                 archive = tarfile.open(path.abspath(output_path), t_mode)
-                add = lambda file_path, file_name: archive.add(file_path, path.join(self.prefix, file_name))
+                add_file = lambda file_path, arcname: archive.add(file_path, path.join(self.prefix, arcname))
+            else:
+                raise RuntimeError("Unknown format: {0}".format(output_format))
+
+            def archiver(file_path, arcname):
+                if self.verbose:
+                    print("Compressing {0} => {1}...".format(arcname, path.join(self.prefix, arcname)))
+                add_file(file_path, arcname)
         else:
-            raise RuntimeError("Unknown format: {f}".format(f=output_format))
+            archive = None
+            archiver = lambda file_path, arcname: print("{0} => {1}".format(arcname, path.join(self.prefix, arcname)))
 
-        for file_path in self.extra:
-            if not dry_run:
-                if self.verbose:
-                    print("Compressing {f} => {a}...".format(f=file_path,
-                                                             a=path.join(self.prefix, file_path)))
-                add(file_path, file_path)
-            else:
-                print("{f} => {a}".format(f=file_path,
-                                          a=path.join(self.prefix, file_path)))
-
-        for file_path in self.list_files():
-            if not dry_run:
-                if self.verbose:
-                    print("Compressing {f} => {a}...".format(f=path.join(self.main_repo_abspath, file_path),
-                                                             a=path.join(self.prefix, file_path)))
-                add(path.join(self.main_repo_abspath, file_path), file_path)
-            else:
-                print("{f} => {a}".format(f=path.join(self.main_repo_abspath, file_path),
-                                          a=path.join(self.prefix, file_path)))
+        self.archive_all_files(archiver)
 
         if not dry_run:
             archive.close()
@@ -268,7 +263,17 @@ class GitArchiver(object):
 
         return is_excluded
 
-    def list_files(self, repo_path=''):
+    def archive_all_files(self, archiver):
+        """Archive all files using archiver.
+
+        @param archiver: Function that accepts 2 arguments: abspath to file on the system and relative path within archive."""
+        for file_path in self.extra:
+            archiver(path.join(file_path, file_path), file_path)
+
+        for file_path in self.walk_git_files():
+            archiver(path.join(self.main_repo_abspath, file_path), file_path)
+
+    def walk_git_files(self, repo_path=''):
         """
         An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive.
@@ -310,7 +315,7 @@ class GitArchiver(object):
         for submodule_path in self.read_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
             # Shell command returns absolute paths to submodules.
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
-            for file_path in self.list_files(submodule_path):
+            for file_path in self.walk_git_files(submodule_path):
                 yield file_path
 
     @staticmethod
