@@ -383,7 +383,10 @@ class GitArchiver(object):
         output = output.decode(encoding)
 
         if p.returncode:
-            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+            if sys.version_info > (2,6):
+                raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+            else:
+                raise CalledProcessError(returncode=p.returncode, cmd=cmd)
 
         return output
 
@@ -408,7 +411,10 @@ class GitArchiver(object):
         output = output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
         if p.returncode:
-            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+            if sys.version_info > (2,6):
+                raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
+            else:
+                raise CalledProcessError(returncode=p.returncode, cmd=cmd)
 
         return output
 
@@ -483,6 +489,6 @@ if __name__ == '__main__':
                                options.extra)
         archiver.create(output_file_path, options.dry_run)
     except Exception as e:
-        parser.exit(2, "{exception}\n".format(exception=e))
+        parser.exit(2, "{0}\n".format(e))
 
     sys.exit(0)
