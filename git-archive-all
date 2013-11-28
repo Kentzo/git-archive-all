@@ -423,34 +423,34 @@ if __name__ == '__main__':
                       type='string',
                       dest='prefix',
                       default='',
-                      help="Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.")
+                      help="prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
                       dest='verbose',
-                      help='Enable verbose mode.')
+                      help='enable verbose mode')
 
     parser.add_option('--no-exclude',
                       action='store_false',
                       dest='exclude',
                       default=True,
-                      help="Don't read .gitattributes files for patterns containing export-ignore attrib.")
+                      help="don't read .gitattributes files for patterns containing export-ignore attrib")
 
     parser.add_option('--force-submodules',
                       action='store_true',
                       dest='force_sub',
-                      help="Force a git submodule init && git submodule update at each level before iterating submodules.")
+                      help="force a git submodule init && git submodule update at each level before iterating submodules")
 
     parser.add_option('--extra',
                       action='append',
                       dest='extra',
                       default=[],
-                      help="Any additional files to include in the archive.")
+                      help="any additional files to include in the archive")
 
     parser.add_option('--dry-run',
                       action='store_true',
                       dest='dry_run',
-                      help="Don't actually archive anything, just show what would be done.")
+                      help="don't actually archive anything, just show what would be done")
 
     options, args = parser.parse_args()
 
