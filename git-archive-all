@@ -130,36 +130,6 @@ class GitArchiver(object):
         if archive is not None:
             archive.close()
 
-    def get_path_components(self, repo_abspath, abspath):
-        """
-        Splits given abspath into components until repo_abspath is reached.
-
-        E.g. if repo_abspath is '/Documents/Hobby/ParaView/' and abspath is
-        '/Documents/Hobby/ParaView/Catalyst/Editions/Base/', function will return:
-        ['.', 'Catalyst', 'Editions', 'Base']
-
-        First element is always '.' (concrete symbol depends on OS).
-
-        @type repo_abspath:     string
-        @param repo_abspath:    Absolute path to the git repository.
-
-        @type abspath:  string
-        @param abspath: Absolute path to within repo_abspath.
-
-        @rtype:     list
-        @return:    List of path components.
-        """
-        components = []
-
-        while not path.samefile(abspath, repo_abspath):
-            abspath, tail = path.split(abspath)
-
-            if len(tail):
-                components.insert(0, tail)
-
-        components.insert(0, path.relpath(repo_abspath, repo_abspath))
-        return components
-
     def get_exclude_patterns(self, repo_abspath, repo_file_paths):
         """
         Returns exclude patterns for a given repo. It looks for .gitattributes files in repo_file_paths.
@@ -315,6 +285,51 @@ class GitArchiver(object):
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
             for file_path in self.walk_git_files(submodule_path):
                 yield file_path
+
+    @staticmethod
+    def get_path_components(repo_abspath, abspath):
+        """
+        Split given abspath into components relative to repo_abspath.
+        These components are primarily used as unique keys of files and folders within a repository.
+
+        E.g. if repo_abspath is '/Documents/Hobby/ParaView/' and abspath is
+        '/Documents/Hobby/ParaView/Catalyst/Editions/Base/', function will return:
+        ['.', 'Catalyst', 'Editions', 'Base']
+
+        First element is always '.' (concrete symbol depends on OS).
+
+        @param repo_abspath: Absolute path to the git repository. Normalized via os.path.normpath.
+        @type repo_abspath: string
+
+        @param abspath: Absolute path to a file within repo_abspath. Normalized via os.path.normpath.
+        @type abspath: string
+
+        @return: List of path components.
+        @rtype: list
+        """
+        repo_abspath = path.normpath(repo_abspath)
+        abspath = path.normpath(abspath)
+
+        if not path.isabs(repo_abspath):
+            raise ValueError("repo_abspath MUST be absolute path.")
+
+        if not path.isabs(abspath):
+            raise ValueError("abspath MUST be absoulte path.")
+
+        if not path.commonprefix([repo_abspath, abspath]):
+            raise ValueError("abspath (\"{0}\") MUST have common prefix with repo_abspath (\"{1}\")".format(abspath, repo_abspath))
+
+        components = []
+
+        while not abspath == repo_abspath:
+            abspath, tail = path.split(abspath)
+
+            if tail:
+                components.insert(0, tail)
+
+        # Get portable version of '.'
+        components.insert(0, path.relpath(repo_abspath, repo_abspath))
+        return components
 
     @staticmethod
     def run_shell(cmd, cwd=None):
