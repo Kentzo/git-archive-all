@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 
 __version__ = "1.7"
 
+import logging
 from os import extsep, path, readlink
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
@@ -21,33 +22,36 @@ class GitArchiver(object):
     Checks for .gitattributes files in each directory and uses 'export-ignore'
     pattern entries for ignore files in the archive.
 
-    Automatically detects output format extension: zip, tar, bz2, or gz.
+    >>> archiver = GitArchiver(main_repo_abspath='my/repo/path')
+    >>> archiver.create('output.zip')
     """
+    LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', verbose=False, exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
         """
-        @type prefix:   string
-        @param prefix:  Prefix used to prepend all paths in the resulting archive.
+        @param prefix: Prefix used to prepend all paths in the resulting archive.
+            Extra file paths are only prefixed if they are not relative.
+            E.g. if prefix is 'foo' and extra is ['bar', '/baz'] the resulting archive will look like this:
+            /
+              baz
+              foo/
+                bar
+        @type prefix: string
 
-        @type verbose:  bool
-        @param verbose: Determines verbosity of the output (stdout).
-
-        @type exclude:  bool
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
-                        Defaults to True.
+        @type exclude:  bool
 
-        @type force_sub:    bool
-        @param force_sub:   Determines whether submodules are initialized and updated before archiving.
-                            Defaults to False
+        @param force_sub: Determines whether submodules are initialized and updated before archiving.
+        @type force_sub: bool
 
-        @type extra:    list
-        @param extra:   List of extra paths to include in the resulting archive.
+        @param extra: List of extra paths to include in the resulting archive.
+        @type extra: list
 
-        @type main_repo_abspath:    string
-        @param main_repo_abspath:   Absolute path to the main repository (or one of subdirectories).
-                                    If None, current cwd is used.
-                                    If given path is path to a subdirectory (but not a submodule directory!)
-                                    it will be replaced with abspath to toplevel directory of the repository.
+        @param main_repo_abspath: Absolute path to the main repository (or one of subdirectories).
+            If given path is path to a subdirectory (but not a submodule directory!) it will be replaced
+            with abspath to top-level directory of the repository.
+            If None, current cwd is used.
+        @type main_repo_abspath: string
         """
         if extra is None:
             extra = []
@@ -65,7 +69,6 @@ class GitArchiver(object):
         main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
 
         self.prefix = prefix
-        self.verbose = verbose
         self.exclude = exclude
         self.extra = extra
         self.force_sub = force_sub
@@ -73,24 +76,25 @@ class GitArchiver(object):
 
     def create(self, output_path, dry_run=False, output_format=None):
         """
-        Creates the archive, written to the given output_file_path
+        Create the archive at output_file_path.
 
-        Type of the archive is determined either by extension of output_file_path or by the format argument.
+        Type of the archive is determined either by extension of output_file_path or by output_format.
         Supported formats are: gz, zip, bz2, tar, tgz
 
-        @type output_path:     string
-        @param output_path:    Output file path.
+        @param output_path: Output file path.
+        @type output_path: string
 
-        @type dry_run:  bool
         @param dry_run: Determines whether create should do nothing but print what it would archive.
+        @type dry_run: bool
 
-        @type output_format:    string
-        @param output_format:   Determines format of the output archive.
-                                If None, format is determined from extension of output_file_path.
+        @param output_format: Determines format of the output archive. If None, format is determined from extension
+            of output_file_path.
+        @type output_format: string
         """
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
+            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
 
         if not dry_run:
             if output_format == 'zip':
@@ -98,9 +102,9 @@ class GitArchiver(object):
 
                 def add_file(file_path, arcname):
                     if not path.islink(file_path):
-                        archive.write(file_path, path.join(self.prefix, arcname), ZIP_DEFLATED)
+                        archive.write(file_path, arcname, ZIP_DEFLATED)
                     else:
-                        i = ZipInfo(path.join(self.prefix, arcname))
+                        i = ZipInfo(arcname)
                         i.create_system = 3
                         i.external_attr = 0xA1ED0000
                         archive.writestr(i, readlink(file_path))
@@ -113,17 +117,16 @@ class GitArchiver(object):
                     t_mode = 'w:{0}'.format(output_format)
 
                 archive = tarfile.open(path.abspath(output_path), t_mode)
-                add_file = lambda file_path, arcname: archive.add(file_path, path.join(self.prefix, arcname))
+                add_file = lambda file_path, arcname: archive.add(file_path, arcname)
             else:
                 raise RuntimeError("Unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                if self.verbose:
-                    print("Compressing {0} => {1}...".format(arcname, path.join(self.prefix, arcname)))
+                self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
-            archiver = lambda file_path, arcname: print("{0} => {1}".format(arcname, path.join(self.prefix, arcname)))
+            archiver = lambda file_path, arcname: self.LOG.info("{0} => {1}".format(file_path, arcname))
 
         self.archive_all_files(archiver)
 
@@ -220,8 +223,7 @@ class GitArchiver(object):
                 patterns = exclude_patterns[key]
                 for p in patterns:
                     if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
-                        if self.verbose:
-                            print("Exclude pattern matched {pattern}: {path}".format(pattern=p, path=repo_file_path))
+                        self.LOG.debug("Exclude pattern matched {pattern}: {path}".format(pattern=p, path=repo_file_path))
                         is_excluded = True
 
             if not len(components):
@@ -232,14 +234,16 @@ class GitArchiver(object):
         return is_excluded
 
     def archive_all_files(self, archiver):
-        """Archive all files using archiver.
+        """
+        Archive all files using archiver.
 
-        @param archiver: Function that accepts 2 arguments: abspath to file on the system and relative path within archive."""
+        @param archiver: Function that accepts 2 arguments: abspath to file on the system and relative path within archive.
+        """
         for file_path in self.extra:
-            archiver(path.join(file_path, file_path), file_path)
+            archiver(path.abspath(file_path), path.join(self.prefix, file_path))
 
         for file_path in self.walk_git_files():
-            archiver(path.join(self.main_repo_abspath, file_path), file_path)
+            archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
 
     def walk_git_files(self, repo_path=''):
         """
@@ -469,8 +473,11 @@ if __name__ == '__main__':
         options.prefix = path.join(output_name, '')
 
     try:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        GitArchiver.LOG.addHandler(handler)
+        GitArchiver.LOG.setLevel(logging.DEBUG if options.verbose else logging.INFO)
         archiver = GitArchiver(options.prefix,
-                               options.verbose,
                                options.exclude,
                                options.force_sub,
                                options.extra)
