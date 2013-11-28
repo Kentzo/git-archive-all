@@ -57,13 +57,11 @@ class GitArchiver(object):
         elif not path.isabs(main_repo_abspath):
             raise ValueError("You MUST pass absolute path to the main git repository.")
 
-        # Raises an exception if there is no repo under main_repo_abspath.
         try:
             self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
         except Exception as e:
             raise ValueError("Not a git repository (or any of the parent directories).".format(path=main_repo_abspath))
 
-        # Detect toplevel directory of the repo.
         main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
 
         self.prefix = prefix
@@ -129,7 +127,7 @@ class GitArchiver(object):
 
         self.archive_all_files(archiver)
 
-        if not dry_run:
+        if archive is not None:
             archive.close()
 
     def get_path_components(self, repo_abspath, abspath):
