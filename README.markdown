@@ -21,3 +21,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   **--extra**               Include extra files to the resulting archive.
 
   **--dry-run**             Don't actually archive anything, just show what would be done.
+
+Paid Support
+------------
+If functional you need is missing but you're ready to pay for it, feel free to contact me. If not, create an issue anyway, I'll take a look as soon as I can.
