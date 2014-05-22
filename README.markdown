@@ -24,4 +24,4 @@ Creates archive from the current state using `git ls-files --cached --full-name 
 
 Paid Support
 ------------
-If functional you need is missing but you're ready to pay for it, feel free to contact me. If not, create an issue anyway, I'll take a look as soon as I can.
+If functional you need is missing but you're ready to pay for it, feel free to [contact me](mailto:kulakov.ilya@gmail.com?subject=New feature for git-archive-all). If not, create an issue anyway, I'll take a look as soon as I can.
