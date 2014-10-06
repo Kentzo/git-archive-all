@@ -428,7 +428,7 @@ if __name__ == '__main__':
     parser.add_option('--prefix',
                       type='string',
                       dest='prefix',
-                      default='',
+                      default=None,
                       help="prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb")
 
     parser.add_option('-v', '--verbose',
@@ -469,7 +469,7 @@ if __name__ == '__main__':
         parser.error("You cannot use directory as output")
 
     # avoid tarbomb
-    if options.prefix:
+    if options.prefix is not None:
         options.prefix = path.join(options.prefix, '')
     else:
         import re
