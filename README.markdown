@@ -12,7 +12,7 @@ Creates archive from the current state using `git ls-files --cached --full-name 
   
   **-v, --verbose**         Enable verbose mode.
   
-  **--prefix=PREFIX**       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb.
+  **--prefix=PREFIX**       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb. You can set it to '' in order to explicitly request tarbomb.
   
   **--no-exclude**          Don't read .gitattributes files for patterns containing export-ignore attributes.
 
