@@ -429,7 +429,7 @@ if __name__ == '__main__':
                       type='string',
                       dest='prefix',
                       default=None,
-                      help="prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb")
+                      help="prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb. You can set it to '' in order to explicitly request tarbomb")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
