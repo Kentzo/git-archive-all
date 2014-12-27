@@ -79,7 +79,7 @@ class GitArchiver(object):
         Create the archive at output_file_path.
 
         Type of the archive is determined either by extension of output_file_path or by output_format.
-        Supported formats are: gz, zip, bz2, tar, tgz
+        Supported formats are: gz, zip, bz2, xz, tar, tgz, txz
 
         @param output_path: Output file path.
         @type output_path: string
@@ -108,11 +108,13 @@ class GitArchiver(object):
                         i.create_system = 3
                         i.external_attr = 0xA1ED0000
                         archive.writestr(i, readlink(file_path))
-            elif output_format in ['tar', 'bz2', 'gz', 'tgz']:
+            elif output_format in ['tar', 'bz2', 'gz', 'xz', 'tgz', 'txz']:
                 if output_format == 'tar':
                     t_mode = 'w'
                 elif output_format == 'tgz':
                     t_mode = 'w:gz'
+                elif output_format == 'txz':
+                    t_mode = 'w:xz'
                 else:
                     t_mode = 'w:{0}'.format(output_format)
 
@@ -475,7 +477,7 @@ if __name__ == '__main__':
         import re
 
         output_name = path.basename(output_file_path)
-        output_name = re.sub('(\.zip|\.tar|\.tgz|\.gz|\.bz2|\.tar\.gz|\.tar\.bz2)$', '', output_name) or "Archive"
+        output_name = re.sub('(\.zip|\.tar|\.tgz|\.txz|\.gz|\.bz2|\.xz|\.tar\.gz|\.tar\.bz2|\.tar\.xz)$', '', output_name) or "Archive"
         options.prefix = path.join(output_name, '')
 
     try:
