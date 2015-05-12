@@ -1,4 +1,4 @@
-Create archive by using the `git ls-files --cached --full-name --no-empty-directory` command. Support sumodule trees regardless of depth.
+Create an archive by using the `git ls-files --cached --full-name --no-empty-directory` command. Support sumodule trees regardless of depth.
 
 *License:* MIT
 
