@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 __version__ = "1.9"
 
 import logging
-from os import extsep, path, readlink
+from os import extsep, path, readlink, curdir
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import tarfile
@@ -332,8 +332,7 @@ class GitArchiver(object):
             if tail:
                 components.insert(0, tail)
 
-        # Get portable version of '.'
-        components.insert(0, path.relpath(repo_abspath, repo_abspath))
+        components.insert(0, curdir)
         return components
 
     @staticmethod
