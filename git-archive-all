@@ -285,7 +285,7 @@ class GitArchiver(object):
             self.run_shell("git submodule init", repo_abspath)
             self.run_shell("git submodule update", repo_abspath)
 
-        for submodule_path in self.read_shell("git submodule --quiet foreach 'pwd'", repo_abspath).splitlines():
+        for submodule_path in self.read_shell("git submodule --quiet foreach 'pwd -P'", repo_abspath).splitlines():
             # Shell command returns absolute paths to submodules.
             submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
             for file_path in self.walk_git_files(submodule_path):
