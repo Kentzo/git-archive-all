@@ -24,10 +24,6 @@
 # THE SOFTWARE.
 
 
-# copied from
-# https://github.com/Kentzo/git-archive-all/blob/master/git-archive-all @ 59dddfb96784e393c2c1f2440c7759736998ec64
-
-
 from __future__ import print_function
 from __future__ import unicode_literals
 
