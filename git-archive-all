@@ -1,10 +1,30 @@
 #! /usr/bin/env python
 # coding=utf-8
 
+# The MIT License (MIT)
+#
+# Copyright (c) 2010, 2011, 2012, 2013, 2014 Ilya Kulakov
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
 from __future__ import print_function
 from __future__ import unicode_literals
-
-__version__ = "1.12"
 
 import logging
 from os import extsep, path, readlink, curdir
@@ -12,6 +32,8 @@ from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import tarfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+
+__version__ = "1.12"
 
 
 class GitArchiver(object):
@@ -64,9 +86,12 @@ class GitArchiver(object):
         try:
             self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
         except Exception as e:
-            raise ValueError("Not a git repository (or any of the parent directories).")
+            raise ValueError("{0} not a git repository (or any of the parent directories).".format(main_repo_abspath))
 
-        main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
+        main_repo_abspath = path.abspath(
+            self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath)
+            .rstrip()
+        )
 
         self.prefix = prefix
         self.exclude = exclude
@@ -94,7 +119,7 @@ class GitArchiver(object):
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
 
         if not dry_run:
             if output_format == 'zip':
@@ -116,21 +141,25 @@ class GitArchiver(object):
                 elif output_format == 'txz':
                     t_mode = 'w:xz'
                 else:
-                    t_mode = 'w:{}'.format(output_format)
+                    t_mode = 'w:{0}'.format(output_format)
 
                 archive = tarfile.open(path.abspath(output_path), t_mode)
-                add_file = lambda file_path, arcname: archive.add(file_path, arcname)
+
+                def add_file(file_path, arcname):
+                    archive.add(file_path, arcname)
             else:
-                raise RuntimeError("Unknown format: {}".format(output_format))
+                raise RuntimeError("Unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("Compressing {} => {}...".format(file_path, arcname))
+                self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
-            archiver = lambda file_path, arcname: self.LOG.info("{} => {}".format(file_path, arcname))
 
-        self.archive_all_files(archiver)
+            def archiver(file_path, arcname):
+                self.LOG.info("{0} => {1}".format(file_path, arcname))
+
+        self.archive_all_files(archiver)  # this will take care of submodule init and update
 
         if archive is not None:
             archive.close()
@@ -225,7 +254,7 @@ class GitArchiver(object):
                 patterns = exclude_patterns[key]
                 for p in patterns:
                     if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
-                        self.LOG.debug("Exclude pattern matched {}: {}".format(p, repo_file_path))
+                        self.LOG.debug("Exclude pattern matched {0}: {1}".format(p, repo_file_path))
                         is_excluded = True
 
             if not len(components):
@@ -239,7 +268,8 @@ class GitArchiver(object):
         """
         Archive all files using archiver.
 
-        @param archiver: Function that accepts 2 arguments: abspath to file on the system and relative path within archive.
+        @param archiver: Function that accepts 2 arguments:
+            abspath to file on the system and relative path within archive.
         """
         for file_path in self.extra:
             archiver(path.abspath(file_path), path.join(self.prefix, file_path))
@@ -263,7 +293,10 @@ class GitArchiver(object):
         @return:    Iterator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.read_git_shell("git ls-files --cached --full-name --no-empty-directory", repo_abspath).splitlines()
+        repo_file_paths = self.read_git_shell(
+            "git ls-files --cached --full-name --no-empty-directory",
+            repo_abspath
+        ).splitlines()
         exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
@@ -273,7 +306,9 @@ class GitArchiver(object):
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
             # Only list symlinks and files that don't start with git.
-            if file_name.startswith(".git") or (not path.islink(main_repo_file_path) and path.isdir(main_repo_file_path)):
+            if file_name.startswith(".git") or (
+                not path.islink(main_repo_file_path) and path.isdir(main_repo_file_path)
+            ):
                 continue
 
             if self.is_file_excluded(repo_abspath, repo_file_path, exclude_patterns):
@@ -322,7 +357,10 @@ class GitArchiver(object):
             raise ValueError("abspath MUST be absoulte path.")
 
         if not path.commonprefix([repo_abspath, abspath]):
-            raise ValueError("abspath (\"{}\") MUST have common prefix with repo_abspath (\"{}\")".format(abspath, repo_abspath))
+            raise ValueError(
+                "abspath (\"{0}\") MUST have common prefix with repo_abspath (\"{1}\")"
+                .format(abspath, repo_abspath)
+            )
 
         components = []
 
@@ -383,7 +421,7 @@ class GitArchiver(object):
         output = output.decode(encoding)
 
         if p.returncode:
-            if sys.version_info > (2,6):
+            if sys.version_info > (2, 6):
                 raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
             else:
                 raise CalledProcessError(returncode=p.returncode, cmd=cmd)
@@ -411,7 +449,7 @@ class GitArchiver(object):
         output = output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
         if p.returncode:
-            if sys.version_info > (2,6):
+            if sys.version_info > (2, 6):
                 raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
             else:
                 raise CalledProcessError(returncode=p.returncode, cmd=cmd)
@@ -422,14 +460,21 @@ class GitArchiver(object):
 if __name__ == '__main__':
     from optparse import OptionParser
 
-    parser = OptionParser(usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
-                          version="%prog {}".format(__version__))
+    parser = OptionParser(
+        usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
+              "       [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
+        version="%prog {0}".format(__version__)
+    )
 
     parser.add_option('--prefix',
                       type='string',
                       dest='prefix',
                       default=None,
-                      help="prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb. You can set it to '' in order to explicitly request tarbomb")
+                      help="""
+                          prepend PREFIX to each filename in the archive.
+                          OUTPUT_FILE name is used by default to avoid tarbomb.
+                          You can set it to '' in order to explicitly request tarbomb
+                      """)
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
@@ -445,7 +490,9 @@ if __name__ == '__main__':
     parser.add_option('--force-submodules',
                       action='store_true',
                       dest='force_sub',
-                      help="force a git submodule init && git submodule update at each level before iterating submodules")
+                      help="""
+                          force a git submodule init && git submodule update at each level before iterating submodules
+                      """)
 
     parser.add_option('--extra',
                       action='append',
@@ -475,7 +522,11 @@ if __name__ == '__main__':
         import re
 
         output_name = path.basename(output_file_path)
-        output_name = re.sub('(\.zip|\.tar|\.tgz|\.txz|\.gz|\.bz2|\.xz|\.tar\.gz|\.tar\.bz2|\.tar\.xz)$', '', output_name) or "Archive"
+        output_name = re.sub(
+            '(\.zip|\.tar|\.tgz|\.txz|\.gz|\.bz2|\.xz|\.tar\.gz|\.tar\.bz2|\.tar\.xz)$',
+            '',
+            output_name
+        ) or "Archive"
         options.prefix = path.join(output_name, '')
 
     try:
@@ -489,6 +540,6 @@ if __name__ == '__main__':
                                options.extra)
         archiver.create(output_file_path, options.dry_run)
     except Exception as e:
-        parser.exit(2, "{}\n".format(e))
+        parser.exit(2, "{0}\n".format(e))
 
     sys.exit(0)
