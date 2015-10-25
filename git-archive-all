@@ -268,7 +268,7 @@ class GitArchiver(object):
         """
         Archive all files using archiver.
 
-        @param archiver: Function that accepts 2 arguments:
+        @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
         """
         for file_path in self.extra:
