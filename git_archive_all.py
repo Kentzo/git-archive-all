@@ -470,11 +470,9 @@ def main():
                       type='string',
                       dest='prefix',
                       default=None,
-                      help="""
-                          prepend PREFIX to each filename in the archive.
+                      help="""prepend PREFIX to each filename in the archive.
                           OUTPUT_FILE name is used by default to avoid tarbomb.
-                          You can set it to '' in order to explicitly request tarbomb
-                      """)
+                          You can set it to '' in order to explicitly request tarbomb""")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
@@ -490,9 +488,7 @@ def main():
     parser.add_option('--force-submodules',
                       action='store_true',
                       dest='force_sub',
-                      help="""
-                          force a git submodule init && git submodule update at each level before iterating submodules
-                      """)
+                      help='force a git submodule init && git submodule update at each level before iterating submodules')
 
     parser.add_option('--extra',
                       action='append',
