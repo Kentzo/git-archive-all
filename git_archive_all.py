@@ -462,7 +462,7 @@ def main():
 
     parser = OptionParser(
         usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              "       [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
+              " [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
 
