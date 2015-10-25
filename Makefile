@@ -6,6 +6,12 @@ TARGET_FILE=$(TARGET_DIR)/git-archive-all
 all:
 	@echo "usage: make install"
 	@echo "       make uninstall"
+	@echo "       test"
+
+test: test_pep
+
+test_pep:
+	pep8 --max-line-length=240 git_archive_all.py
 
 install:
 	install -d -m 0755 $(TARGET_DIR)
