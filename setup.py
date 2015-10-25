@@ -21,7 +21,7 @@ setup(
     author='Ilya Kulakov',
     author_email="kulakov.ilya@gmail.com",
     url='https://github.com/Kentzo/git-archive-all',
-    scripts=['git_archive_all.py'],
+    py_modules=['git_archive_all'],
     entry_points="""
     [console_scripts]
     git-archive-all=git_archive_all:main
