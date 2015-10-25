@@ -18,8 +18,24 @@ else:
 setup(
     name=SCRIPT,
     version=verstr,
-    description='Like git-archive, but archives a git superproject and its submodules',
+    description='Archive git repository with its submodules.',
     author='Ilya Kulakov',
+    author_email="kulakov.ilya@gmail.com",
     url='https://github.com/Kentzo/git-archive-all',
     scripts = [SCRIPT],
+    license="MIT License",
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Environment :: Console',
+        'Intended Audience :: Developers',
+        'Intended Audience :: System Administrators',
+        'License :: OSI Approved :: MIT License',
+        'Natural Language :: English',
+        'Programming Language :: Python :: 2.6',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Topic :: Software Development :: Version Control',
+        'Topic :: System :: Archiving',
+
+    ]
 )
