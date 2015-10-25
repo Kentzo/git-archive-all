@@ -4,10 +4,9 @@ try:
 except ImportError:
     from distutils.core import setup
 
-SCRIPT="git-archive-all"
 
 # Parse the version from the file.
-verstrline = open(SCRIPT, "rt").read()
+verstrline = open('git_archive_all.py', "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)
 if mo:
@@ -16,13 +15,17 @@ else:
     raise RuntimeError("Unable to find version string in %s." % (SCRIPT,))
 
 setup(
-    name=SCRIPT,
+    name='git-archive-all',
     version=verstr,
     description='Archive git repository with its submodules.',
     author='Ilya Kulakov',
     author_email="kulakov.ilya@gmail.com",
     url='https://github.com/Kentzo/git-archive-all',
-    scripts = [SCRIPT],
+    scripts=['git_archive_all.py'],
+    entry_points="""
+    [console_scripts]
+    git-archive-all=git_archive_all:main
+    """,
     license="MIT License",
     classifiers=[
         'Development Status :: 5 - Production/Stable',

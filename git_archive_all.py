@@ -457,7 +457,7 @@ class GitArchiver(object):
         return output
 
 
-if __name__ == '__main__':
+def main():
     from optparse import OptionParser
 
     parser = OptionParser(
@@ -543,3 +543,7 @@ if __name__ == '__main__':
         parser.exit(2, "{0}\n".format(e))
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
