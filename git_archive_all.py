@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2010, 2011, 2012, 2013, 2014 Ilya Kulakov
+# Copyright (c) 2010 Ilya Kulakov
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-
 
 from __future__ import print_function
 from __future__ import unicode_literals
@@ -50,7 +49,7 @@ class GitArchiver(object):
     """
     LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', treeish='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
         """
         @param prefix: Prefix used to prepend all paths in the resulting archive.
             Extra file paths are only prefixed if they are not relative.
@@ -60,9 +59,6 @@ class GitArchiver(object):
               foo/
                 bar
         @type prefix: string
-
-        @param treeish: Determines the tree-ish reference you want to archive
-        @type treeish: string
 
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
         @type exclude:  bool
@@ -90,7 +86,7 @@ class GitArchiver(object):
         try:
             self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
         except Exception as e:
-            raise ValueError("{} not a git repository (or any of the parent directories).".format(main_repo_abspath))
+            raise ValueError("{0} not a git repository (or any of the parent directories).".format(main_repo_abspath))
 
         main_repo_abspath = path.abspath(
             self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath)
@@ -98,12 +94,10 @@ class GitArchiver(object):
         )
 
         self.prefix = prefix
-        self.treeish = treeish
         self.exclude = exclude
         self.extra = extra
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
-        self.prev_head = self.read_git_shell('git rev-parse HEAD', main_repo_abspath).rstrip()
 
     def create(self, output_path, dry_run=False, output_format=None):
         """
@@ -156,17 +150,17 @@ class GitArchiver(object):
                 elif output_format == 'txz':
                     t_mode = 'w:xz'
                 else:
-                    t_mode = 'w:{}'.format(output_format)
+                    t_mode = 'w:{0}'.format(output_format)
 
                 archive = tarfile.open(path.abspath(output_path), t_mode)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise RuntimeError("Unknown format: {}".format(output_format))
+                raise RuntimeError("Unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("Compressing {} => {}...".format(file_path, arcname))
+                self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
@@ -277,7 +271,7 @@ class GitArchiver(object):
                 patterns = exclude_patterns[key]
                 for p in patterns:
                     if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
-                        self.LOG.debug("Exclude pattern matched {}: {}".format(p, repo_file_path))
+                        self.LOG.debug("Exclude pattern matched {0}: {1}".format(p, repo_file_path))
                         is_excluded = True
 
             if not len(components):
@@ -291,7 +285,7 @@ class GitArchiver(object):
         """
         Archive all files using archiver.
 
-        @param archiver: Function that accepts 2 arguments:
+        @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
         """
         for file_path in self.extra:
@@ -381,7 +375,7 @@ class GitArchiver(object):
 
         if not path.commonprefix([repo_abspath, abspath]):
             raise ValueError(
-                "abspath (\"{}\") MUST have common prefix with repo_abspath (\"{}\")"
+                "abspath (\"{0}\") MUST have common prefix with repo_abspath (\"{1}\")"
                 .format(abspath, repo_abspath)
             )
 
@@ -480,24 +474,22 @@ class GitArchiver(object):
         return output
 
 
-if __name__ == '__main__':
+def main():
     from optparse import OptionParser
 
     parser = OptionParser(
         usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              "       [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
-        version="%prog {}".format(__version__)
+              " [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
+        version="%prog {0}".format(__version__)
     )
 
     parser.add_option('--prefix',
                       type='string',
                       dest='prefix',
                       default=None,
-                      help="""
-                          prepend PREFIX to each filename in the archive.
+                      help="""prepend PREFIX to each filename in the archive.
                           OUTPUT_FILE name is used by default to avoid tarbomb.
-                          You can set it to '' in order to explicitly request tarbomb
-                      """)
+                          You can set it to '' in order to explicitly request tarbomb""")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
@@ -513,9 +505,7 @@ if __name__ == '__main__':
     parser.add_option('--force-submodules',
                       action='store_true',
                       dest='force_sub',
-                      help="""
-                          force a git submodule init && git submodule update at each level before iterating submodules
-                      """)
+                      help='force a git submodule init && git submodule update at each level before iterating submodules')
 
     parser.add_option('--extra',
                       action='append',
@@ -563,6 +553,10 @@ if __name__ == '__main__':
                                options.extra)
         archiver.create(output_file_path, options.dry_run)
     except Exception as e:
-        parser.exit(2, "{}\n".format(e))
+        parser.exit(2, "{0}\n".format(e))
 
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
