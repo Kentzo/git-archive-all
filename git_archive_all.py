@@ -27,7 +27,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
-from os import extsep, path, readlink, curdir, path
+from os import extsep, path, readlink, curdir
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import tarfile
