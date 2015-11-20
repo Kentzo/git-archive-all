@@ -32,6 +32,7 @@ from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import tarfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+import re
 
 __version__ = "1.13"
 
@@ -84,7 +85,7 @@ class GitArchiver(object):
             raise ValueError("You MUST pass absolute path to the main git repository.")
 
         try:
-            self.run_shell("[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
+            path.isdir(".git") or self.run_shell("git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
         except Exception as e:
             raise ValueError("{0} not a git repository (or any of the parent directories).".format(main_repo_abspath))
 
@@ -320,11 +321,16 @@ class GitArchiver(object):
             self.run_shell("git submodule init", repo_abspath)
             self.run_shell("git submodule update", repo_abspath)
 
-        for submodule_path in self.read_shell("git submodule --quiet foreach 'pwd -P'", repo_abspath).splitlines():
-            # Shell command returns absolute paths to submodules.
-            submodule_path = path.relpath(submodule_path, self.main_repo_abspath)
-            for file_path in self.walk_git_files(submodule_path):
-                yield file_path
+        gitmodulesfile = path.join(repo_path, ".gitmodules")
+        if path.isfile(gitmodulesfile):
+            with open(gitmodulesfile) as f:
+                for line in f.readlines():
+                    m = re.match("^\s*path\s*=\s*(.*)\s*$", line)
+                    if m:
+                        submodule_path = m.group(1)
+                        submodule_path = path.join(repo_path, submodule_path)
+                        for file_path in self.walk_git_files(submodule_path):
+                            yield file_path
 
     @staticmethod
     def get_path_components(repo_abspath, abspath):
