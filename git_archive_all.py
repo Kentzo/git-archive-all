@@ -306,10 +306,8 @@ class GitArchiver(object):
             file_name = path.basename(repo_file_path)
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
-            # Only list symlinks and files that don't start with git.
-            if file_name.startswith(".git") or (
-                not path.islink(main_repo_file_path) and path.isdir(main_repo_file_path)
-            ):
+            # Only list symlinks and files.
+            if not path.islink(main_repo_file_path) and path.isdir(main_repo_file_path):
                 continue
 
             if self.is_file_excluded(repo_abspath, repo_file_path, exclude_patterns):
