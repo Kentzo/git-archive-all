@@ -319,7 +319,7 @@ class GitArchiver(object):
             self.run_shell("git submodule init", repo_abspath)
             self.run_shell("git submodule update", repo_abspath)
 
-        gitmodulesfile = path.join(repo_path, ".gitmodules")
+        gitmodulesfile = path.join(repo_abspath, ".gitmodules")
         if path.isfile(gitmodulesfile):
             with open(gitmodulesfile) as f:
                 for line in f.readlines():
