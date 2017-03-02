@@ -330,7 +330,7 @@ class GitArchiver(object):
 
                     for submodule_file_path in self.walk_git_files(submodule_path):
                         yield submodule_file_path
-        except FileNotFoundError:
+        except IOError:
             pass
 
     @staticmethod
