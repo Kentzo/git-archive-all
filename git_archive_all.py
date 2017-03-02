@@ -59,10 +59,10 @@ class GitArchiver(object):
               baz
               foo/
                 bar
-        @type prefix: string
+        @type prefix: str
 
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
-        @type exclude:  bool
+        @type exclude: bool
 
         @param force_sub: Determines whether submodules are initialized and updated before archiving.
         @type force_sub: bool
@@ -74,7 +74,7 @@ class GitArchiver(object):
             If given path is path to a subdirectory (but not a submodule directory!) it will be replaced
             with abspath to top-level directory of the repository.
             If None, current cwd is used.
-        @type main_repo_abspath: string
+        @type main_repo_abspath: str
         """
         if extra is None:
             extra = []
@@ -108,19 +108,19 @@ class GitArchiver(object):
         Supported formats are: gz, zip, bz2, xz, tar, tgz, txz
 
         @param output_path: Output file path.
-        @type output_path: string
+        @type output_path: str
 
         @param dry_run: Determines whether create should do nothing but print what it would archive.
         @type dry_run: bool
 
         @param output_format: Determines format of the output archive. If None, format is determined from extension
             of output_file_path.
-        @type output_format: string
+        @type output_format: str
         """
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is {}.".format(output_format))
 
         if not dry_run:
             if output_format == 'zip':
@@ -149,18 +149,18 @@ class GitArchiver(object):
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise RuntimeError("Unknown format: {0}".format(output_format))
+                raise RuntimeError("unknown format: {}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
+                self.LOG.debug("Compressing {} => {}...".format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info("{0} => {1}".format(file_path, arcname))
+                self.LOG.info("{} => {}".format(file_path, arcname))
 
-        self.archive_all_files(archiver)  # this will take care of submodule init and update
+        self.archive_all_files(archiver)
 
         if archive is not None:
             archive.close()
@@ -170,18 +170,18 @@ class GitArchiver(object):
         Returns exclude patterns for a given repo. It looks for .gitattributes files in repo_file_paths.
 
         Resulting dictionary will contain exclude patterns per path (relative to the repo_abspath).
-        E.g. {('.', 'Catalyst', 'Editions', 'Base'), ['Foo*', '*Bar']}
+        E.g. {('.', 'Catalyst', 'Editions', 'Base'): ['Foo*', '*Bar']}
 
-        @type repo_abspath:     string
-        @param repo_abspath:    Absolute path to the git repository.
+        @param repo_abspath: Absolute path to the git repository.
+        @type repo_abspath: str
 
-        @type repo_file_paths:  list
         @param repo_file_paths: List of paths relative to the repo_abspath that are under git control.
+        @type repo_file_paths:  list
 
-        @rtype:         dict
-        @return:    Dictionary representing exclude patterns.
-                    Keys are tuples of strings. Values are lists of strings.
-                    Returns None if self.exclude is not set.
+        @return: Dictionary representing exclude patterns.
+            Keys are tuples of strings. Values are lists of strings.
+            Returns None if self.exclude is not set.
+        @rtype: dict or None
         """
         if not self.exclude:
             return None
@@ -226,17 +226,17 @@ class GitArchiver(object):
         """
         Checks whether file at a given path is excluded.
 
-        @type repo_abspath: string
         @param repo_abspath: Absolute path to the git repository.
+        @type repo_abspath: str
 
-        @type repo_file_path:   string
-        @param repo_file_path:  Path to a file within repo_abspath.
+        @param repo_file_path: Path to a file within repo_abspath.
+        @type repo_file_path: str
 
-        @type exclude_patterns:     dict
-        @param exclude_patterns:    Exclude patterns with format specified for get_exclude_patterns.
+        @param exclude_patterns: Exclude patterns with format specified for get_exclude_patterns.
+        @type exclude_patterns: dict
 
-        @rtype: bool
         @return: True if file should be excluded. Otherwise False.
+        @rtype: bool
         """
         if exclude_patterns is None or not len(exclude_patterns):
             return False
@@ -271,6 +271,7 @@ class GitArchiver(object):
 
         @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
+        @type archiver: Callable
         """
         for file_path in self.extra:
             archiver(path.abspath(file_path), path.join(self.prefix, file_path))
@@ -287,11 +288,11 @@ class GitArchiver(object):
 
         Recurs into submodules as well.
 
-        @type repo_path:    string
-        @param repo_path:   Path to the git submodule repository relative to main_repo_abspath.
+        @param repo_path: Path to the git submodule repository relative to main_repo_abspath.
+        @type repo_path: str
 
-        @rtype:     iterator
-        @return:    Iterator to traverse files under git control relative to main_repo_abspath.
+        @return: Iterator to traverse files under git control relative to main_repo_abspath.
+        @rtype: Iterable
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.read_git_shell(
@@ -340,13 +341,13 @@ class GitArchiver(object):
         '/Documents/Hobby/ParaView/Catalyst/Editions/Base/', function will return:
         ['.', 'Catalyst', 'Editions', 'Base']
 
-        First element is always '.' (concrete symbol depends on OS).
+        First element is always os.curdir (concrete symbol depends on OS).
 
         @param repo_abspath: Absolute path to the git repository. Normalized via os.path.normpath.
-        @type repo_abspath: string
+        @type repo_abspath: str
 
         @param abspath: Absolute path to a file within repo_abspath. Normalized via os.path.normpath.
-        @type abspath: string
+        @type abspath: str
 
         @return: List of path components.
         @rtype: list
@@ -382,14 +383,14 @@ class GitArchiver(object):
         """
         Runs shell command.
 
-        @type cmd:  string
         @param cmd: Command to be executed.
+        @type cmd: str
 
-        @type cwd:  string
         @param cwd: Working directory.
+        @type cwd: str
 
-        @rtype:     int
-        @return:    Return code of the command.
+        @return: Return code of the command.
+        @rtype: int
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
@@ -406,17 +407,17 @@ class GitArchiver(object):
         """
         Runs shell command and reads output.
 
-        @type cmd:  string
         @param cmd: Command to be executed.
+        @type cmd: str
 
-        @type cwd:  string
         @param cwd: Working directory.
+        @type cwd: str
 
-        @type encoding: string
         @param encoding: Encoding used to decode bytes returned by Popen into string.
+        @type encoding: str
 
-        @rtype:     string
-        @return:    Output of the command.
+        @return: Output of the command.
+        @rtype: str
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
@@ -437,14 +438,14 @@ class GitArchiver(object):
         """
         Runs git shell command, reads output and decodes it into unicode string
 
-        @type cmd:  string
         @param cmd: Command to be executed.
+        @type cmd: str
 
-        @type cwd:  string
+        @type cwd: str
         @param cwd: Working directory.
 
-        @rtype:     string
-        @return:    Output of the command.
+        @rtype: str
+        @return: Output of the command.
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
