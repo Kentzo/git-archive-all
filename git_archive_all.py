@@ -323,13 +323,15 @@ class GitArchiver(object):
         gitmodulesfile = path.join(repo_path, ".gitmodules")
         if path.isfile(gitmodulesfile):
             with open(gitmodulesfile) as f:
-                for line in f.readlines():
-                    m = re.match("^\s*path\s*=\s*(.*)\s*$", line)
-                    if m:
-                        submodule_path = m.group(1)
-                        submodule_path = path.join(repo_path, submodule_path)
-                        for file_path in self.walk_git_files(submodule_path):
-                            yield file_path
+                lines = f.readlines()
+
+            for l in lines:
+                m = re.match("^\s*path\s*=\s*(.*)\s*$", l)
+                if m:
+                    submodule_path = m.group(1)
+                    submodule_path = path.join(repo_path, submodule_path)
+                    for file_path in self.walk_git_files(submodule_path):
+                        yield file_path
 
     @staticmethod
     def get_path_components(repo_abspath, abspath):
