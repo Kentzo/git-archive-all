@@ -196,7 +196,7 @@ class GitArchiver(object):
 
         # There may be no gitattributes.
         try:
-            global_attributes_abspath = self.read_shell("git config --get core.attributesfile", repo_abspath).rstrip()
+            global_attributes_abspath = self.read_git_shell("git config --get core.attributesfile", repo_abspath).rstrip()
             exclude_patterns[()] = read_attributes(global_attributes_abspath)
         except:
             # And it's valid to not have them.
@@ -312,8 +312,8 @@ class GitArchiver(object):
             yield main_repo_file_path
 
         if self.force_sub:
-            self.run_shell("git submodule init", repo_abspath)
-            self.run_shell("git submodule update", repo_abspath)
+            self.run_git_shell("git submodule init", repo_abspath)
+            self.run_git_shell("git submodule update", repo_abspath)
 
         try:
             repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
@@ -381,64 +381,9 @@ class GitArchiver(object):
         return components
 
     @staticmethod
-    def run_shell(cmd, cwd=None):
+    def run_git_shell(cmd, cwd=None):
         """
-        Runs shell command.
-
-        @param cmd: Command to be executed.
-        @type cmd: str
-
-        @param cwd: Working directory.
-        @type cwd: str
-
-        @return: Return code of the command.
-        @rtype: int
-
-        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
-        """
-        p = Popen(cmd, shell=True, cwd=cwd)
-        p.wait()
-
-        if p.returncode:
-            raise CalledProcessError(returncode=p.returncode, cmd=cmd)
-
-        return p.returncode
-
-    @staticmethod
-    def read_shell(cmd, cwd=None, encoding='utf-8'):
-        """
-        Runs shell command and reads output.
-
-        @param cmd: Command to be executed.
-        @type cmd: str
-
-        @param cwd: Working directory.
-        @type cwd: str
-
-        @param encoding: Encoding used to decode bytes returned by Popen into string.
-        @type encoding: str
-
-        @return: Output of the command.
-        @rtype: str
-
-        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
-        """
-        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
-        output, _ = p.communicate()
-        output = output.decode(encoding)
-
-        if p.returncode:
-            if sys.version_info > (2, 6):
-                raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
-            else:
-                raise CalledProcessError(returncode=p.returncode, cmd=cmd)
-
-        return output
-
-    @staticmethod
-    def read_git_shell(cmd, cwd=None):
-        """
-        Runs git shell command, reads output and decodes it into unicode string
+        Runs git shell command, reads output and decodes it into unicode string.
 
         @param cmd: Command to be executed.
         @type cmd: str
