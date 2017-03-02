@@ -34,7 +34,7 @@ import tarfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import re
 
-__version__ = "1.15"
+__version__ = "1.16"
 
 
 class GitArchiver(object):
