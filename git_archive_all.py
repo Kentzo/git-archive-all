@@ -82,17 +82,12 @@ class GitArchiver(object):
         if main_repo_abspath is None:
             main_repo_abspath = path.abspath('')
         elif not path.isabs(main_repo_abspath):
-            raise ValueError("You MUST pass absolute path to the main git repository.")
+            raise ValueError("main_repo_abspath must be an absolute path")
 
         try:
-            path.isdir(".git") or self.run_shell("git rev-parse --git-dir > /dev/null 2>&1", main_repo_abspath)
-        except Exception as e:
-            raise ValueError("{0} not a git repository (or any of the parent directories).".format(main_repo_abspath))
-
-        main_repo_abspath = path.abspath(
-            self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath)
-            .rstrip()
-        )
+            main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
+        except CalledProcessError:
+            raise ValueError("{} is not part of a git repository".format(main_repo_abspath))
 
         self.prefix = prefix
         self.exclude = exclude
