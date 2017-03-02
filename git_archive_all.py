@@ -299,11 +299,11 @@ class GitArchiver(object):
         for repo_file_path in repo_file_paths:
             # Git puts path in quotes if file path has unicode characters.
             repo_file_path = repo_file_path.strip('"')  # file path relative to current repo
-            file_name = path.basename(repo_file_path)
+            repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
             # Only list symlinks and files.
-            if not path.islink(main_repo_file_path) and path.isdir(main_repo_file_path):
+            if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
                 continue
 
             if self.is_file_excluded(repo_abspath, repo_file_path, exclude_patterns):
@@ -315,18 +315,23 @@ class GitArchiver(object):
             self.run_shell("git submodule init", repo_abspath)
             self.run_shell("git submodule update", repo_abspath)
 
-        gitmodulesfile = path.join(repo_path, ".gitmodules")
-        if path.isfile(gitmodulesfile):
-            with open(gitmodulesfile) as f:
+        try:
+            repo_gitmodules_path = path.join(repo_abspath, ".gitmodules")
+
+            with open(repo_gitmodules_path) as f:
                 lines = f.readlines()
 
             for l in lines:
                 m = re.match("^\s*path\s*=\s*(.*)\s*$", l)
+
                 if m:
                     submodule_path = m.group(1)
                     submodule_path = path.join(repo_path, submodule_path)
-                    for file_path in self.walk_git_files(submodule_path):
-                        yield file_path
+
+                    for submodule_file_path in self.walk_git_files(submodule_path):
+                        yield submodule_file_path
+        except FileNotFoundError:
+            pass
 
     @staticmethod
     def get_path_components(repo_abspath, abspath):
