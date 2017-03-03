@@ -85,7 +85,7 @@ class GitArchiver(object):
             raise ValueError("main_repo_abspath must be an absolute path")
 
         try:
-            main_repo_abspath = path.abspath(self.read_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
+            main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
         except CalledProcessError:
             raise ValueError("{} is not part of a git repository".format(main_repo_abspath))
 
@@ -196,7 +196,7 @@ class GitArchiver(object):
 
         # There may be no gitattributes.
         try:
-            global_attributes_abspath = self.read_git_shell("git config --get core.attributesfile", repo_abspath).rstrip()
+            global_attributes_abspath = self.run_git_shell("git config --get core.attributesfile", repo_abspath).rstrip()
             exclude_patterns[()] = read_attributes(global_attributes_abspath)
         except:
             # And it's valid to not have them.
@@ -290,7 +290,7 @@ class GitArchiver(object):
         @rtype: Iterable
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.read_git_shell(
+        repo_file_paths = self.run_git_shell(
             "git ls-files --cached --full-name --no-empty-directory",
             repo_abspath
         ).splitlines()
