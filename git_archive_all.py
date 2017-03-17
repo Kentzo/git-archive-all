@@ -34,7 +34,7 @@ import tarfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import re
 
-__version__ = "1.16"
+__version__ = "1.16.4"
 
 
 class GitArchiver(object):
@@ -87,7 +87,7 @@ class GitArchiver(object):
         try:
             main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
         except CalledProcessError:
-            raise ValueError("{} is not part of a git repository".format(main_repo_abspath))
+            raise ValueError("{0} is not part of a git repository".format(main_repo_abspath))
 
         self.prefix = prefix
         self.exclude = exclude
@@ -115,7 +115,7 @@ class GitArchiver(object):
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
 
         if not dry_run:
             if output_format == 'zip':
@@ -144,16 +144,16 @@ class GitArchiver(object):
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise RuntimeError("unknown format: {}".format(output_format))
+                raise RuntimeError("unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("Compressing {} => {}...".format(file_path, arcname))
+                self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info("{} => {}".format(file_path, arcname))
+                self.LOG.info("{0} => {1}".format(file_path, arcname))
 
         self.archive_all_files(archiver)
 
