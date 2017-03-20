@@ -117,6 +117,15 @@ class GitArchiver(object):
             output_format = file_ext[len(extsep):].lower()
             self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
 
+        def treeish_clean_checkout(treeish, repo_abspath) :
+            # this will switch branches and clean any changes from index
+            self.run_shell("git checkout {0} && git reset --hard {0}".format(treeish), repo_abspath)
+            # Also removes untracked files and folders
+            self.run_shell("git ls-files --others | xargs -r rm -r", repo_abspath)
+
+        if self.treeish:
+            treeish_clean_checkout(self.treeish, self.main_repo_abspath)
+
         if not dry_run:
             if output_format == 'zip':
                 archive = ZipFile(path.abspath(output_path), 'w')
@@ -159,6 +168,14 @@ class GitArchiver(object):
 
         if archive is not None:
             archive.close()
+
+        if self.treeish:
+            treeish_clean_checkout(self.prev_head, self.main_repo_abspath)
+            if self.force_sub:
+                # we need to re update submodules
+                self.run_shell("git submodule init", self.main_repo_abspath)
+                self.run_shell("git submodule update", self.main_repo_abspath)
+
 
     def get_exclude_patterns(self, repo_abspath, repo_file_paths):
         """
