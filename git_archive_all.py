@@ -95,7 +95,7 @@ class GitArchiver(object):
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
 
-    def create(self, output_path, dry_run=False, output_format=None):
+    def create(self, output_path, dry_run=False, output_format=None, topless=False):
         """
         Create the archive at output_file_path.
 
@@ -142,6 +142,8 @@ class GitArchiver(object):
                 archive = tarfile.open(path.abspath(output_path), t_mode)
 
                 def add_file(file_path, arcname):
+                    if topless:
+                        arcname = path.join(*(arcname.split(path.sep)[1:]))
                     archive.add(file_path, arcname)
             else:
                 raise RuntimeError("unknown format: {0}".format(output_format))
@@ -414,7 +416,7 @@ def main():
 
     parser = OptionParser(
         usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              " [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
+              " [--extra EXTRA1 [EXTRA2]] [--dry-run] [--topless] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
 
@@ -453,6 +455,11 @@ def main():
                       dest='dry_run',
                       help="don't actually archive anything, just show what would be done")
 
+    parser.add_option('--topless',
+                      action='store_true',
+                      dest='topless',
+                      help="when packing don't add another hierarchy on top")
+
     options, args = parser.parse_args()
 
     if len(args) != 1:
@@ -486,7 +493,7 @@ def main():
                                options.exclude,
                                options.force_sub,
                                options.extra)
-        archiver.create(output_file_path, options.dry_run)
+        archiver.create(output_file_path, options.dry_run, topless=options.topless)
     except Exception as e:
         parser.exit(2, "{0}\n".format(e))
 
