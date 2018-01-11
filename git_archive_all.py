@@ -332,6 +332,9 @@ class GitArchiver(object):
                         continue
 
                     for submodule_file_path in self.walk_git_files(submodule_path):
+                        if self.is_file_excluded(repo_abspath, submodule_file_path, exclude_patterns):
+                            continue
+
                         yield submodule_file_path
         except IOError:
             pass
