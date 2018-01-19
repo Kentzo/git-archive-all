@@ -326,12 +326,14 @@ class GitArchiver(object):
 
                 if m:
                     submodule_path = m.group(1)
+                    submodule_abspath = path.join(repo_path, submodule_path)
+
                     if self.is_file_excluded(repo_abspath, submodule_path, exclude_patterns):
                         continue
-                    submodule_path = path.join(repo_path, submodule_path)
 
-                    for submodule_file_path in self.walk_git_files(submodule_path):
-                        if self.is_file_excluded(repo_abspath, submodule_file_path, exclude_patterns):
+                    for submodule_file_path in self.walk_git_files(submodule_abspath):
+                        rel_file_path = submodule_file_path.replace(repo_path, "", 1).strip("/")
+                        if self.is_file_excluded(repo_abspath, rel_file_path, exclude_patterns):
                             continue
 
                         yield submodule_file_path
