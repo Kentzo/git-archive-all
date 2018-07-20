@@ -27,7 +27,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
-from os import extsep, path, readlink, curdir
+from os import extsep, path, readlink
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import tarfile
@@ -160,64 +160,7 @@ class GitArchiver(object):
         if archive is not None:
             archive.close()
 
-    def get_exclude_patterns(self, repo_abspath, repo_file_paths):
-        """
-        Returns exclude patterns for a given repo. It looks for .gitattributes files in repo_file_paths.
-
-        Resulting dictionary will contain exclude patterns per path (relative to the repo_abspath).
-        E.g. {('.', 'Catalyst', 'Editions', 'Base'): ['Foo*', '*Bar']}
-
-        @param repo_abspath: Absolute path to the git repository.
-        @type repo_abspath: str
-
-        @param repo_file_paths: List of paths relative to the repo_abspath that are under git control.
-        @type repo_file_paths:  list
-
-        @return: Dictionary representing exclude patterns.
-            Keys are tuples of strings. Values are lists of strings.
-            Returns None if self.exclude is not set.
-        @rtype: dict or None
-        """
-        if not self.exclude:
-            return None
-
-        def read_attributes(attributes_abspath):
-            patterns = []
-            if path.isfile(attributes_abspath):
-                attributes = open(attributes_abspath, 'r').readlines()
-                patterns = []
-                for line in attributes:
-                    tokens = line.strip().split()
-                    if "export-ignore" in tokens[1:]:
-                        patterns.append(tokens[0])
-            return patterns
-
-        exclude_patterns = {(): []}
-
-        # There may be no gitattributes.
-        try:
-            global_attributes_abspath = self.run_git_shell("git config --get core.attributesfile", repo_abspath).rstrip()
-            exclude_patterns[()] = read_attributes(global_attributes_abspath)
-        except:
-            # And it's valid to not have them.
-            pass
-
-        for attributes_abspath in [path.join(repo_abspath, f) for f in repo_file_paths if f.endswith(".gitattributes")]:
-            # Each .gitattributes affects only files within its directory.
-            key = tuple(self.get_path_components(repo_abspath, path.dirname(attributes_abspath)))
-            exclude_patterns[key] = read_attributes(attributes_abspath)
-
-        local_attributes_abspath = path.join(repo_abspath, ".git", "info", "attributes")
-        key = tuple(self.get_path_components(repo_abspath, repo_abspath))
-
-        if key in exclude_patterns:
-            exclude_patterns[key].extend(read_attributes(local_attributes_abspath))
-        else:
-            exclude_patterns[key] = read_attributes(local_attributes_abspath)
-
-        return exclude_patterns
-
-    def is_file_excluded(self, repo_abspath, repo_file_path, exclude_patterns):
+    def is_file_excluded(self, repo_abspath, repo_file_path):
         """
         Checks whether file at a given path is excluded.
 
@@ -227,38 +170,14 @@ class GitArchiver(object):
         @param repo_file_path: Path to a file within repo_abspath.
         @type repo_file_path: str
 
-        @param exclude_patterns: Exclude patterns with format specified for get_exclude_patterns.
-        @type exclude_patterns: dict
-
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
-        if exclude_patterns is None or not len(exclude_patterns):
-            return False
-
-        from fnmatch import fnmatch
-
-        file_name = path.basename(repo_file_path)
-        components = self.get_path_components(repo_abspath, path.join(repo_abspath, path.dirname(repo_file_path)))
-
-        is_excluded = False
-        # We should check all patterns specified in intermediate directories to the given file.
-        # At the end we should also check for the global patterns (key '()' or empty tuple).
-        while not is_excluded:
-            key = tuple(components)
-            if key in exclude_patterns:
-                patterns = exclude_patterns[key]
-                for p in patterns:
-                    if fnmatch(file_name, p) or fnmatch(repo_file_path, p):
-                        self.LOG.debug("Exclude pattern matched {0}: {1}".format(p, repo_file_path))
-                        is_excluded = True
-
-            if not len(components):
-                break
-
-            components.pop()
-
-        return is_excluded
+        out = self.run_git_shell(
+            'git check-attr -a -- %s' % repo_file_path,
+            cwd=repo_abspath
+        )
+        return 'export-ignore: set' in out
 
     def archive_all_files(self, archiver):
         """
@@ -294,7 +213,6 @@ class GitArchiver(object):
             "git ls-files --cached --full-name --no-empty-directory",
             repo_abspath
         ).splitlines()
-        exclude_patterns = self.get_exclude_patterns(repo_abspath, repo_file_paths)
 
         for repo_file_path in repo_file_paths:
             # Git puts path in quotes if file path has unicode characters.
@@ -306,7 +224,7 @@ class GitArchiver(object):
             if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
                 continue
 
-            if self.is_file_excluded(repo_abspath, repo_file_path, exclude_patterns):
+            if self.is_file_excluded(repo_abspath, repo_file_path):
                 continue
 
             yield main_repo_file_path
@@ -328,64 +246,17 @@ class GitArchiver(object):
                     submodule_path = m.group(1)
                     submodule_abspath = path.join(repo_path, submodule_path)
 
-                    if self.is_file_excluded(repo_abspath, submodule_path, exclude_patterns):
+                    if self.is_file_excluded(repo_abspath, submodule_path):
                         continue
 
                     for submodule_file_path in self.walk_git_files(submodule_abspath):
                         rel_file_path = submodule_file_path.replace(repo_path, "", 1).strip("/")
-                        if self.is_file_excluded(repo_abspath, rel_file_path, exclude_patterns):
+                        if self.is_file_excluded(repo_abspath, rel_file_path):
                             continue
 
                         yield submodule_file_path
         except IOError:
             pass
-
-    @staticmethod
-    def get_path_components(repo_abspath, abspath):
-        """
-        Split given abspath into components relative to repo_abspath.
-        These components are primarily used as unique keys of files and folders within a repository.
-
-        E.g. if repo_abspath is '/Documents/Hobby/ParaView/' and abspath is
-        '/Documents/Hobby/ParaView/Catalyst/Editions/Base/', function will return:
-        ['.', 'Catalyst', 'Editions', 'Base']
-
-        First element is always os.curdir (concrete symbol depends on OS).
-
-        @param repo_abspath: Absolute path to the git repository. Normalized via os.path.normpath.
-        @type repo_abspath: str
-
-        @param abspath: Absolute path to a file within repo_abspath. Normalized via os.path.normpath.
-        @type abspath: str
-
-        @return: List of path components.
-        @rtype: list
-        """
-        repo_abspath = path.normpath(repo_abspath)
-        abspath = path.normpath(abspath)
-
-        if not path.isabs(repo_abspath):
-            raise ValueError("repo_abspath MUST be absolute path.")
-
-        if not path.isabs(abspath):
-            raise ValueError("abspath MUST be absoulte path.")
-
-        if not path.commonprefix([repo_abspath, abspath]):
-            raise ValueError(
-                "abspath (\"{0}\") MUST have common prefix with repo_abspath (\"{1}\")"
-                .format(abspath, repo_abspath)
-            )
-
-        components = []
-
-        while not abspath == repo_abspath:
-            abspath, tail = path.split(abspath)
-
-            if tail:
-                components.insert(0, tail)
-
-        components.insert(0, curdir)
-        return components
 
     @staticmethod
     def run_git_shell(cmd, cwd=None):
