@@ -18,13 +18,6 @@ def makedirs(p):
             raise
 
 
-def pytest_param(*values, **kwargs):
-    try:
-        return pytest.param(*values, **kwargs)
-    except AttributeError:
-        return values
-
-
 @pytest.fixture
 def git_env(tmpdir_factory):
     """
@@ -141,49 +134,49 @@ base = {
 }
 
 ignore_in_root = deepcopy(base)
-ignore_in_root['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_root['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_root['tests'] = DirRecord({
     '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_submodule = deepcopy(base)
-ignore_in_submodule['lib']['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_submodule['lib']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_submodule['lib']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Flat is better than nested.', excluded=True)
 })
 
 ignore_in_nested_submodule = deepcopy(base)
-ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_nested_submodule['lib']['extra']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Sparse is better than dense.', excluded=True)
 })
 
 ignore_in_submodule_from_root = deepcopy(base)
-ignore_in_submodule_from_root['.gitattributes'] = FileRecord('\nlib/tests/__init__.py export-ignore')
+ignore_in_submodule_from_root['.gitattributes'] = FileRecord('lib/tests/__init__.py export-ignore')
 ignore_in_submodule_from_root['lib']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Readability counts.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_root = deepcopy(base)
-ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord('\nlib/extra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord('lib/extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_root['lib']['extra']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Special cases aren\'t special enough to break the rules.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_submodule = deepcopy(base)
-ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord('\nextra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord('extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_submodule['lib']['extra']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Although practicality beats purity.', excluded=True)
 })
 
 
 @pytest.mark.parametrize('contents', [
-    pytest_param(base, id='No Ignore'),
-    pytest_param(ignore_in_root, id='Ignore in Root'),
-    pytest_param(ignore_in_submodule, id='Ignore in Submodule'),
-    pytest_param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
-    pytest_param(ignore_in_submodule_from_root, id='Ignore in Submodule from Root'),
-    pytest_param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
+    pytest.param(base, id='No Ignore'),
+    pytest.param(ignore_in_root, id='Ignore in Root'),
+    pytest.param(ignore_in_submodule, id='Ignore in Submodule'),
+    pytest.param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
+    pytest.param(ignore_in_submodule_from_root, id='Ignore in Submodule from Root'),
+    pytest.param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
 ])
 def test_ignore(contents, tmpdir, git_env):
     """
