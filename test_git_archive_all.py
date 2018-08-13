@@ -169,6 +169,12 @@ ignore_in_nested_submodule_from_submodule['lib']['extra']['tests'] = DirRecord({
     '__init__.py': FileRecord('#Although practicality beats purity.', excluded=True)
 })
 
+unset_export_ignore = deepcopy(base)
+unset_export_ignore['.gitattributes'] = FileRecord('.* export-ignore\n*.htaccess -export-ignore', excluded=True)
+unset_export_ignore['.a'] = FileRecord('Errors should never pass silently.', excluded=True)
+unset_export_ignore['.b'] = FileRecord('Unless explicitly silenced.', excluded=True)
+unset_export_ignore['.htaccess'] = FileRecord('In the face of ambiguity, refuse the temptation to guess.')
+
 
 @pytest.mark.parametrize('contents', [
     pytest.param(base, id='No Ignore'),
@@ -177,6 +183,7 @@ ignore_in_nested_submodule_from_submodule['lib']['extra']['tests'] = DirRecord({
     pytest.param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
     pytest.param(ignore_in_submodule_from_root, id='Ignore in Submodule from Root'),
     pytest.param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
+    pytest.param(unset_export_ignore, id='-export-ignore')
 ])
 def test_ignore(contents, tmpdir, git_env):
     """
