@@ -186,8 +186,6 @@ matrix:
       python: nightly
 
 install:
-  - which python
-  - ls env/bin
   - curl ${PIP_URL} | python
   - ${PIP} install -r requirements.txt
 
