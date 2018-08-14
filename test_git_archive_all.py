@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from copy import deepcopy
 import errno
 from functools import partial
@@ -183,13 +185,13 @@ unset_export_ignore['.htaccess'] = FileRecord('Readability counts.')
 
 unicode_base = deepcopy(base)
 unicode_base['data'] = DirRecord({
-    'مرحبا بالعالم.dat': FileRecord('Special cases aren\'t special enough to break the rules.')
+    u'مرحبا بالعالم.dat': FileRecord('Special cases aren\'t special enough to break the rules.')
 })
 
 unicode_quoted = deepcopy(base)
 unicode_quoted['data'] = DirRecord({
-    '\"مرحبا بالعالم.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
+    u'\"مرحبا بالعالم.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    u'\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
 })
 
 
