@@ -8,7 +8,8 @@ import errno
 from functools import partial
 import os
 from subprocess import check_call
-from tarfile import TarFile
+import sys
+from tarfile import TarFile, PAX_FORMAT
 
 import pycodestyle
 import pytest
@@ -224,7 +225,7 @@ def test_ignore(contents, tmpdir, git_env):
 
     repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
     repo.archive(repo_tar_path)
-    repo_tar = TarFile(repo_tar_path)
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
     def make_expected(contents):
         e = {}
@@ -243,7 +244,12 @@ def test_ignore(contents, tmpdir, git_env):
 
         for m in tar_file.getmembers():
             if m.isfile():
-                a[m.name] = tar_file.extractfile(m).read().decode()
+                name = m.name
+
+                if sys.version_info < (3,):
+                    name = m.name.decode('utf-8')
+
+                a[name] = tar_file.extractfile(m).read().decode()
             else:
                 raise NotImplementedError
 
