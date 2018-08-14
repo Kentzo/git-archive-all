@@ -210,7 +210,7 @@ class GitArchiver(object):
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.run_git_shell(
-            "git ls-files --cached --full-name --no-empty-directory",
+            'git ls-files --cached --full-name --no-empty-directory',
             repo_abspath
         ).splitlines()
 
@@ -230,8 +230,8 @@ class GitArchiver(object):
             yield main_repo_file_path
 
         if self.force_sub:
-            self.run_git_shell("git submodule init", repo_abspath)
-            self.run_git_shell("git submodule update", repo_abspath)
+            self.run_git_shell('git submodule init', repo_abspath)
+            self.run_git_shell('git submodule update', repo_abspath)
 
         try:
             repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
