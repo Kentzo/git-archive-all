@@ -9,7 +9,6 @@ all:
 	@echo "       test"
 
 test:
-	pycodestyle --config=. --max-line-length=240 git_archive_all.py
 	python setup.py test
 
 install:

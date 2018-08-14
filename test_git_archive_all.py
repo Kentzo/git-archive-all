@@ -7,6 +7,7 @@ import os
 from subprocess import check_call
 from tarfile import TarFile
 
+import pycodestyle
 import pytest
 
 from git_archive_all import GitArchiver
@@ -249,3 +250,9 @@ def test_ignore(contents, tmpdir, git_env):
     actual = make_actual(repo_tar)
 
     assert actual == expected
+
+
+def test_pycodestyle():
+    style = pycodestyle.StyleGuide(repeat=True, max_line_length=240)
+    report = style.check_files(['git_archive_all.py'])
+    assert report.total_errors == 0, "Found code style errors (and warnings)."
