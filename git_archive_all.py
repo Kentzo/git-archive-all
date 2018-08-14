@@ -174,10 +174,14 @@ class GitArchiver(object):
         @rtype: bool
         """
         out = self.run_git_shell(
-            'git check-attr export-ignore -- %s' % repo_file_path,
+            'git check-attr -z export-ignore -- %s' % repo_file_path,
             cwd=repo_abspath
-        )
-        return 'export-ignore: set' in out
+        ).split('\0')
+
+        try:
+            return out[2] == 'set'
+        except IndexError:
+            return False
 
     def archive_all_files(self, archiver):
         """
