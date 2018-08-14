@@ -190,7 +190,7 @@ install:
   - ${PIP} install -r requirements.txt
 
 script:
-  - python setup.py test
+  - make test
 
 after_success:
   - python -m codecov
