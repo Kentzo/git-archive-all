@@ -1,10 +1,17 @@
+# -*- coding: utf-8 -*-
+
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from copy import deepcopy
 import errno
 from functools import partial
 import os
 from subprocess import check_call
-from tarfile import TarFile
+import sys
+from tarfile import TarFile, PAX_FORMAT
 
+import pycodestyle
 import pytest
 
 from git_archive_all import GitArchiver
@@ -16,13 +23,6 @@ def makedirs(p):
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-
-
-def pytest_param(*values, **kwargs):
-    try:
-        return pytest.param(*values, **kwargs)
-    except AttributeError:
-        return values
 
 
 @pytest.fixture
@@ -140,50 +140,78 @@ base = {
     })
 }
 
+base_quoted = deepcopy(base)
+base_quoted['data'] = DirRecord({
+    '\"hello world.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\'hello world.dat\'': FileRecord('Although practicality beats purity.')
+})
+
 ignore_in_root = deepcopy(base)
-ignore_in_root['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_root['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_root['tests'] = DirRecord({
     '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_submodule = deepcopy(base)
-ignore_in_submodule['lib']['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_submodule['lib']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_submodule['lib']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Flat is better than nested.', excluded=True)
+    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule = deepcopy(base)
-ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord('\ntests/__init__.py export-ignore')
+ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
 ignore_in_nested_submodule['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Sparse is better than dense.', excluded=True)
+    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_submodule_from_root = deepcopy(base)
-ignore_in_submodule_from_root['.gitattributes'] = FileRecord('\nlib/tests/__init__.py export-ignore')
+ignore_in_submodule_from_root['.gitattributes'] = FileRecord('lib/tests/__init__.py export-ignore')
 ignore_in_submodule_from_root['lib']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Readability counts.', excluded=True)
+    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_root = deepcopy(base)
-ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord('\nlib/extra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord('lib/extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_root['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Special cases aren\'t special enough to break the rules.', excluded=True)
+    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_submodule = deepcopy(base)
-ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord('\nextra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord('extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_submodule['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Although practicality beats purity.', excluded=True)
+    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+})
+
+unset_export_ignore = deepcopy(base)
+unset_export_ignore['.gitattributes'] = FileRecord('.* export-ignore\n*.htaccess -export-ignore', excluded=True)
+unset_export_ignore['.a'] = FileRecord('Flat is better than nested.', excluded=True)
+unset_export_ignore['.b'] = FileRecord('Sparse is better than dense.', excluded=True)
+unset_export_ignore['.htaccess'] = FileRecord('Readability counts.')
+
+unicode_base = deepcopy(base)
+unicode_base['data'] = DirRecord({
+    'مرحبا بالعالم.dat': FileRecord('Special cases aren\'t special enough to break the rules.')
+})
+
+unicode_quoted = deepcopy(base)
+unicode_quoted['data'] = DirRecord({
+    '\"مرحبا بالعالم.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
 })
 
 
 @pytest.mark.parametrize('contents', [
-    pytest_param(base, id='No Ignore'),
-    pytest_param(ignore_in_root, id='Ignore in Root'),
-    pytest_param(ignore_in_submodule, id='Ignore in Submodule'),
-    pytest_param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
-    pytest_param(ignore_in_submodule_from_root, id='Ignore in Submodule from Root'),
-    pytest_param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
+    pytest.param(base, id='No Ignore'),
+    pytest.param(base_quoted, id='No Ignore (Quoted)'),
+    pytest.param(ignore_in_root, id='Ignore in Root'),
+    pytest.param(ignore_in_submodule, id='Ignore in Submodule'),
+    pytest.param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
+    pytest.param(ignore_in_submodule_from_root, id='Ignore in Submodule from Root'),
+    pytest.param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
+    pytest.param(ignore_in_nested_submodule_from_submodule, id='Ignore in Nested Submodule from Submodule'),
+    pytest.param(unset_export_ignore, id='-export-ignore'),
+    pytest.param(unicode_base, id='No Ignore (Unicode)'),
+    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)')
 ])
 def test_ignore(contents, tmpdir, git_env):
     """
@@ -197,7 +225,7 @@ def test_ignore(contents, tmpdir, git_env):
 
     repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
     repo.archive(repo_tar_path)
-    repo_tar = TarFile(repo_tar_path)
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
     def make_expected(contents):
         e = {}
@@ -216,7 +244,12 @@ def test_ignore(contents, tmpdir, git_env):
 
         for m in tar_file.getmembers():
             if m.isfile():
-                a[m.name] = tar_file.extractfile(m).read().decode()
+                name = m.name
+
+                if sys.version_info < (3,):
+                    name = m.name.decode('utf-8')
+
+                a[name] = tar_file.extractfile(m).read().decode()
             else:
                 raise NotImplementedError
 
@@ -226,3 +259,9 @@ def test_ignore(contents, tmpdir, git_env):
     actual = make_actual(repo_tar)
 
     assert actual == expected
+
+
+def test_pycodestyle():
+    style = pycodestyle.StyleGuide(repeat=True, max_line_length=240)
+    report = style.check_files(['git_archive_all.py'])
+    assert report.total_errors == 0, "Found code style errors (and warnings)."

@@ -167,17 +167,21 @@ class GitArchiver(object):
         @param repo_abspath: Absolute path to the git repository.
         @type repo_abspath: str
 
-        @param repo_file_path: Path to a file within repo_abspath.
+        @param repo_file_path: Path to a file relative to repo_abspath.
         @type repo_file_path: str
 
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
         out = self.run_git_shell(
-            'git check-attr -a -- %s' % repo_file_path,
+            'git check-attr -z export-ignore -- %s' % repo_file_path,
             cwd=repo_abspath
-        )
-        return 'export-ignore: set' in out
+        ).split('\0')
+
+        try:
+            return out[2] == 'set'
+        except IndexError:
+            return False
 
     def archive_all_files(self, archiver):
         """
@@ -210,13 +214,11 @@ class GitArchiver(object):
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.run_git_shell(
-            "git ls-files --cached --full-name --no-empty-directory",
+            'git ls-files -z --cached --full-name --no-empty-directory',
             repo_abspath
-        ).splitlines()
+        ).split('\0')[:-1]
 
         for repo_file_path in repo_file_paths:
-            # Git puts path in quotes if file path has unicode characters.
-            repo_file_path = repo_file_path.strip('"')  # file path relative to current repo
             repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
@@ -230,8 +232,8 @@ class GitArchiver(object):
             yield main_repo_file_path
 
         if self.force_sub:
-            self.run_git_shell("git submodule init", repo_abspath)
-            self.run_git_shell("git submodule update", repo_abspath)
+            self.run_git_shell('git submodule init', repo_abspath)
+            self.run_git_shell('git submodule update', repo_abspath)
 
         try:
             repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
@@ -240,21 +242,21 @@ class GitArchiver(object):
                 lines = f.readlines()
 
             for l in lines:
-                m = re.match("^\s*path\s*=\s*(.*)\s*$", l)
+                m = re.match("^\\s*path\\s*=\\s*(.*)\\s*$", l)
 
                 if m:
-                    submodule_path = m.group(1)
-                    submodule_abspath = path.join(repo_path, submodule_path)
+                    repo_submodule_path = m.group(1)  # relative to repo_path
+                    main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
-                    if self.is_file_excluded(repo_abspath, submodule_path):
+                    if self.is_file_excluded(repo_abspath, repo_submodule_path):
                         continue
 
-                    for submodule_file_path in self.walk_git_files(submodule_abspath):
-                        rel_file_path = submodule_file_path.replace(repo_path, "", 1).strip("/")
-                        if self.is_file_excluded(repo_abspath, rel_file_path):
+                    for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
+                        repo_submodule_file_path = main_repo_submodule_file_path.replace(repo_path, "", 1).strip("/")
+                        if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
                             continue
 
-                        yield submodule_file_path
+                        yield main_repo_submodule_file_path
         except IOError:
             pass
 
@@ -349,7 +351,7 @@ def main():
 
         output_name = path.basename(output_file_path)
         output_name = re.sub(
-            '(\.zip|\.tar|\.tgz|\.txz|\.gz|\.bz2|\.xz|\.tar\.gz|\.tar\.bz2|\.tar\.xz)$',
+            '(\\.zip|\\.tar|\\.tgz|\\.txz|\\.gz|\\.bz2|\\.xz|\\.tar\\.gz|\\.tar\\.bz2|\\.tar\\.xz)$',
             '',
             output_name
         ) or "Archive"
