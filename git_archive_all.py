@@ -215,8 +215,10 @@ class GitArchiver(object):
         ).splitlines()
 
         for repo_file_path in repo_file_paths:
-            # Git puts path in quotes if file path has unicode characters.
-            repo_file_path = repo_file_path.strip('"')  # file path relative to current repo
+            # Git quotes output if it contains non-ASCII or otherwise problematic characters as ".
+            if repo_file_path.startswith('"') and repo_file_path.endswith('"'):
+                repo_file_path = repo_file_path[1:-1]
+
             repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
