@@ -167,14 +167,14 @@ class GitArchiver(object):
         @param repo_abspath: Absolute path to the git repository.
         @type repo_abspath: str
 
-        @param repo_file_path: Path to a file within repo_abspath.
+        @param repo_file_path: Path to a file relative to repo_abspath.
         @type repo_file_path: str
 
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
         out = self.run_git_shell(
-            'git check-attr -a -- %s' % repo_file_path,
+            'git check-attr export-ignore -- %s' % repo_file_path,
             cwd=repo_abspath
         )
         return 'export-ignore: set' in out
