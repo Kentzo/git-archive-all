@@ -238,7 +238,7 @@ class GitArchiver(object):
                 lines = f.readlines()
 
             for l in lines:
-                m = re.match("^\s*path\s*=\s*(.*)\s*$", l)
+                m = re.match("^\\s*path\\s*=\\s*(.*)\\s*$", l)
 
                 if m:
                     repo_submodule_path = m.group(1)  # relative to repo_path
@@ -347,7 +347,7 @@ def main():
 
         output_name = path.basename(output_file_path)
         output_name = re.sub(
-            '(\.zip|\.tar|\.tgz|\.txz|\.gz|\.bz2|\.xz|\.tar\.gz|\.tar\.bz2|\.tar\.xz)$',
+            '(\\.zip|\\.tar|\\.tgz|\\.txz|\\.gz|\\.bz2|\\.xz|\\.tar\\.gz|\\.tar\\.bz2|\\.tar\\.xz)$',
             '',
             output_name
         ) or "Archive"
