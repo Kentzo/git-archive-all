@@ -245,18 +245,18 @@ class GitArchiver(object):
                 m = re.match("^\s*path\s*=\s*(.*)\s*$", l)
 
                 if m:
-                    submodule_path = m.group(1)
-                    submodule_abspath = path.join(repo_path, submodule_path)
+                    repo_submodule_path = m.group(1)  # relative to repo_path
+                    main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
-                    if self.is_file_excluded(repo_abspath, submodule_path):
+                    if self.is_file_excluded(repo_abspath, repo_submodule_path):
                         continue
 
-                    for submodule_file_path in self.walk_git_files(submodule_abspath):
-                        rel_file_path = submodule_file_path.replace(repo_path, "", 1).strip("/")
-                        if self.is_file_excluded(repo_abspath, rel_file_path):
+                    for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
+                        repo_submodule_file_path = main_repo_submodule_file_path.replace(repo_path, "", 1).strip("/")
+                        if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
                             continue
 
-                        yield submodule_file_path
+                        yield main_repo_submodule_file_path
         except IOError:
             pass
 
