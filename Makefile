@@ -8,10 +8,9 @@ all:
 	@echo "       make uninstall"
 	@echo "       test"
 
-test: test_pep
-
-test_pep:
-	pep8 --max-line-length=240 git_archive_all.py
+test:
+	pycodestyle --config=. --max-line-length=240 git_archive_all.py
+	python setup.py test
 
 install:
 	install -d -m 0755 $(TARGET_DIR)
