@@ -210,15 +210,11 @@ class GitArchiver(object):
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
         repo_file_paths = self.run_git_shell(
-            'git ls-files --cached --full-name --no-empty-directory',
+            'git ls-files -z --cached --full-name --no-empty-directory',
             repo_abspath
-        ).splitlines()
+        ).split('\0')[:-1]
 
         for repo_file_path in repo_file_paths:
-            # Git quotes output if it contains non-ASCII or otherwise problematic characters as ".
-            if repo_file_path.startswith('"') and repo_file_path.endswith('"'):
-                repo_file_path = repo_file_path[1:-1]
-
             repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
             main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
 
