@@ -104,77 +104,41 @@ matrix:
   - os: linux
     env:
     - PIP_URL="https://bootstrap.pypa.io/2.6/get-pip.py"
-    - PIP=env/bin/pip
+    - PIP=pip
     language: python
     python: 2.6
-    before_install:
-    - pip install virtualenv
-    - python2.6 -m virtualenv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 2.7
-    before_install:
-    - pip install virtualenv
-    - python2.7 -m virtualenv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: pypy
-    before_install:
-    - pip install virtualenv
-    - pypy -m virtualenv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.4
-    before_install:
-    - python3.4 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.5
-    before_install:
-    - python3.5 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.6
-    before_install:
-    - python3.6 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.7
     dist: xenial
     sudo: true
-    before_install:
-    - python3.7 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.6-dev
-    before_install:
-    - python3.6 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: 3.7-dev
-    before_install:
-    - python3.7 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: nightly
-    before_install:
-    - python3 -m venv env
-    - source env/bin/activate
   - os: linux
     language: python
     python: pypy3
-    before_install:
-    - pypy3 -m venv env
-    - source env/bin/activate
   allow_failures:
   - os: osx
     env: NAME="Python HEAD"
@@ -195,16 +159,11 @@ script:
 after_success:
 - python -m codecov
 
-before_deploy:
-- deactivate
-
 deploy:
 - provider: pypi
-  edge:
-    branch: sudo-pypi
   user: Ilya.Kulakov
   password:
-    secure: "VlZYEwVXqGknNEfz6vCo26JWtcbXfBY0ihG+Co6PO7JQn2jEoogKEsMhi3f/rs22nlsH124AQa7bugmH1TkgBn8ODsKLZWGAQKSm9tQlYD2idsTYqCDk5bCAWpjX/RJqZZeMnDmL9BFJkaubrTfnFWdMxI1xXi/G9wC4NaSXSJc="
+    secure: "fDYi/HJvYyqUggKmN/Dc6YewUsBAzHWBdTYMpDfHETeOIvv2G268atnIwcoWav63fwPUpagwOlzQhRklqeLRmjEzr4M+wzFsAQVAnj6a7ChLPWPmgZlClFRpm6leWZjzGD+1FPnH/vvwTHlDi7j+1zgfh4WEellnw3hU+Lzjx+o="
   distributions: "sdist bdist_wheel"
   on:
     tags: true
