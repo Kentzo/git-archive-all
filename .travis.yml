@@ -195,6 +195,9 @@ script:
 after_success:
 - python -m codecov
 
+before_deploy:
+- deactivate
+
 deploy:
 - provider: pypi
   user: Ilya.Kulakov
