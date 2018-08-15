@@ -200,6 +200,8 @@ before_deploy:
 
 deploy:
 - provider: pypi
+  edge:
+    branch: sudo-pypi
   user: Ilya.Kulakov
   password:
     secure: "VlZYEwVXqGknNEfz6vCo26JWtcbXfBY0ihG+Co6PO7JQn2jEoogKEsMhi3f/rs22nlsH124AQa7bugmH1TkgBn8ODsKLZWGAQKSm9tQlYD2idsTYqCDk5bCAWpjX/RJqZZeMnDmL9BFJkaubrTfnFWdMxI1xXi/G9wC4NaSXSJc="
