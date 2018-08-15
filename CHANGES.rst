@@ -8,3 +8,4 @@ CHANGES
 - Add tests
 - Use `git check-attr` to test against export-ignore
 - Better support for unicode file names
+- Require Git >= 1.6.1
