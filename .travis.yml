@@ -207,7 +207,7 @@ deploy:
   on:
     tags: true
     branch: master
-    python: 3.7
+    python: 3.6
 - provider: releases
   api_key:
     secure: "QHn7vzWo7rbgemP37qdNU4h+q7Xb2CQ7HxPFfa7yTsxFd8V4+sQLVrnaQtzYTM8dJWvRgi8PVHVGl2VGnQAiRM4Nd/NE/3HL9aHQIfWRtZ6XHfNVQ55bxJzLfZZy2M+32b8W268ELj3ty4C3Mo7TuOTv4svQoRDrLzGozJCpu+w="
