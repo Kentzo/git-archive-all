@@ -174,7 +174,7 @@ class GitArchiver(object):
         @rtype: bool
         """
         out = self.run_git_shell(
-            'git check-attr -z export-ignore -- %s' % repo_file_path,
+            'git check-attr -z export-ignore -- \"%s\"' % repo_file_path,
             cwd=repo_abspath
         ).split('\0')
 
