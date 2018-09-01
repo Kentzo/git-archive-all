@@ -199,6 +199,54 @@ unicode_quoted['data'] = DirRecord({
     '\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
 })
 
+brackets_base = deepcopy(base)
+brackets_base['data'] = DirRecord({
+    '[.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '(.dat': FileRecord('Although practicality beats purity.'),
+    '{.dat': FileRecord('Errors should never pass silently.'),
+    '].dat': FileRecord('Unless explicitly silenced.'),
+    ').dat': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
+    '}.dat': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
+    '[].dat': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
+    '().dat': FileRecord('Now is better than never.'),
+    '{}.dat': FileRecord('Although never is often better than *right* now.'),
+})
+
+brackets_quoted = deepcopy(base)
+brackets_quoted['data'] = DirRecord({
+    '\"[.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\'[.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\"(.dat\"': FileRecord('Although practicality beats purity.'),
+    '\'(.dat\'': FileRecord('Although practicality beats purity.'),
+    '\"{.dat\"': FileRecord('Errors should never pass silently.'),
+    '\'{.dat\'': FileRecord('Errors should never pass silently.'),
+    '\"].dat\"': FileRecord('Unless explicitly silenced.'),
+    '\'].dat\'': FileRecord('Unless explicitly silenced.'),
+    '\").dat\"': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
+    '\').dat\'': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
+    '\"}.dat\"': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
+    '\'}.dat\'': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
+    '\"[].dat\"': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
+    '\'[].dat\'': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
+    '\"().dat\"': FileRecord('Now is better than never.'),
+    '\'().dat\'': FileRecord('Now is better than never.'),
+    '\"{}.dat\"': FileRecord('Although never is often better than *right* now.'),
+    '\'{}.dat\'': FileRecord('Although never is often better than *right* now.'),
+})
+
+quote_base = deepcopy(base)
+quote_base['data'] = DirRecord({
+    '\'.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\".dat': FileRecord('Although practicality beats purity.'),
+})
+
+quote_quoted = deepcopy(base)
+quote_quoted['data'] = DirRecord({
+    '\"\'.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\'\'.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\"\".dat\"': FileRecord('Although practicality beats purity.'),
+    '\'\".dat\'': FileRecord('Although practicality beats purity.'),
+})
 
 @pytest.mark.parametrize('contents', [
     pytest.param(base, id='No Ignore'),
@@ -211,7 +259,11 @@ unicode_quoted['data'] = DirRecord({
     pytest.param(ignore_in_nested_submodule_from_submodule, id='Ignore in Nested Submodule from Submodule'),
     pytest.param(unset_export_ignore, id='-export-ignore'),
     pytest.param(unicode_base, id='No Ignore (Unicode)'),
-    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)')
+    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)'),
+    pytest.param(brackets_base, id='Brackets'),
+    pytest.param(brackets_quoted, id="Brackets (Quoted)"),
+    pytest.param(quote_base, id="Quote"),
+    pytest.param(quote_quoted, id="Quote (Quoted)")
 ])
 def test_ignore(contents, tmpdir, git_env):
     """

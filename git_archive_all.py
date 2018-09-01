@@ -34,7 +34,24 @@ import tarfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import re
 
-__version__ = "1.18.0"
+__version__ = "1.18.1"
+
+
+try:
+    # Python 3.3+
+    from shlex import quote
+except ImportError:
+    _find_unsafe = re.compile(r'[^a-zA-Z0-9_@%+=:,./-]').search
+
+    def quote(s):
+        """Return a shell-escaped version of the string *s*."""
+        if not s:
+            return "''"
+
+        if _find_unsafe(s) is None:
+            return s
+
+        return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
 class GitArchiver(object):
@@ -173,8 +190,9 @@ class GitArchiver(object):
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
+        print(repo_file_path)
         out = self.run_git_shell(
-            'git check-attr -z export-ignore -- %s' % repo_file_path,
+            'git check-attr -z export-ignore -- %s' % quote(repo_file_path),
             cwd=repo_abspath
         ).split('\0')
 
