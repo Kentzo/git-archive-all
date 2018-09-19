@@ -4,6 +4,9 @@
 .. image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
     :target: https://travis-ci.org/Kentzo/git-archive-all
     :alt: Travis
+.. image:: https://codecov.io/gh/Kentzo/git-archive-all/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/Kentzo/git-archive-all/branch/master
+    :alt: Coverage
 .. image:: https://img.shields.io/pypi/pyversions/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: Supported Python versions
