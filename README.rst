@@ -1,3 +1,16 @@
+.. image:: https://img.shields.io/pypi/v/git-archive-all.svg
+    :target: https://pypi.python.org/pypi/git-archive-all
+    :alt: PyPI
+.. image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
+    :target: https://travis-ci.org/Kentzo/git-archive-all
+    :alt: Travis
+.. image:: https://img.shields.io/pypi/pyversions/git-archive-all.svg
+    :target: https://pypi.python.org/pypi/git-archive-all
+    :alt: Supported Python versions
+.. image:: https://img.shields.io/pypi/implementation/git-archive-all.svg
+    :target: https://pypi.python.org/pypi/git-archive-all
+    :alt: Supported Python implementations
+
 Archive repository with all its submodules.
 
 ::
