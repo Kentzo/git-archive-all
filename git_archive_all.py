@@ -161,7 +161,7 @@ class GitArchiver(object):
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise RuntimeError("unknown format: {0}".format(output_format))
+                raise ValueError("unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
                 self.LOG.debug("Compressing {0} => {1}...".format(file_path, arcname))
