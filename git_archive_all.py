@@ -190,7 +190,6 @@ class GitArchiver(object):
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
-        print(repo_file_path)
         out = self.run_git_shell(
             'git check-attr -z export-ignore -- %s' % quote(repo_file_path),
             cwd=repo_abspath
