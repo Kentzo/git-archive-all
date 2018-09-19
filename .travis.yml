@@ -158,6 +158,7 @@ script:
 
 after_success:
 - python -m codecov
+- python setup.py sdist bdist_wheel
 
 deploy:
 - provider: pypi
@@ -170,6 +171,7 @@ deploy:
     branch: master
     python: 3.6
 - provider: releases
+  skip_cleanup: true
   api_key:
     secure: "QHn7vzWo7rbgemP37qdNU4h+q7Xb2CQ7HxPFfa7yTsxFd8V4+sQLVrnaQtzYTM8dJWvRgi8PVHVGl2VGnQAiRM4Nd/NE/3HL9aHQIfWRtZ6XHfNVQ55bxJzLfZZy2M+32b8W268ELj3ty4C3Mo7TuOTv4svQoRDrLzGozJCpu+w="
   file_glob: true
