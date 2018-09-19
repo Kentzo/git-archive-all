@@ -30,8 +30,6 @@ import logging
 from os import extsep, path, readlink
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
-import tarfile
-from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import re
 
 __version__ = "1.18.1"
@@ -65,6 +63,17 @@ class GitArchiver(object):
     >>> archiver = GitArchiver(main_repo_abspath='my/repo/path')
     >>> archiver.create('output.zip')
     """
+    TARFILE_FORMATS = {
+        'tar': 'w',
+        'tbz2': 'w:bz2',
+        'tgz': 'w:gz',
+        'txz': 'w:xz',
+        'bz2': 'w:bz2',
+        'gz': 'w:gz',
+        'xz': 'w:xz'
+    }
+    ZIPFILE_FORMATS = ('.zip',)
+
     LOG = logging.getLogger('GitArchiver')
 
     def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
@@ -135,7 +144,9 @@ class GitArchiver(object):
             self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
 
         if not dry_run:
-            if output_format == 'zip':
+            if output_format in self.ZIPFILE_FORMATS:
+                from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
+
                 archive = ZipFile(path.abspath(output_path), 'w')
 
                 def add_file(file_path, arcname):
@@ -146,17 +157,11 @@ class GitArchiver(object):
                         i.create_system = 3
                         i.external_attr = 0xA1ED0000
                         archive.writestr(i, readlink(file_path))
-            elif output_format in ['tar', 'bz2', 'gz', 'xz', 'tgz', 'txz']:
-                if output_format == 'tar':
-                    t_mode = 'w'
-                elif output_format == 'tgz':
-                    t_mode = 'w:gz'
-                elif output_format == 'txz':
-                    t_mode = 'w:xz'
-                else:
-                    t_mode = 'w:{0}'.format(output_format)
+            elif output_format in self.TARFILE_FORMATS:
+                import tarfile
 
-                archive = tarfile.open(path.abspath(output_path), t_mode)
+                mode = self.TARFILE_FORMATS[output_format]
+                archive = tarfile.open(path.abspath(output_path), mode)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
@@ -364,11 +369,9 @@ def main():
     if options.prefix is not None:
         options.prefix = path.join(options.prefix, '')
     else:
-        import re
-
         output_name = path.basename(output_file_path)
         output_name = re.sub(
-            '(\\.zip|\\.tar|\\.tgz|\\.txz|\\.gz|\\.bz2|\\.xz|\\.tar\\.gz|\\.tar\\.bz2|\\.tar\\.xz)$',
+            '(\\.zip|\\.tar|\\.tbz2|\\.tgz|\\.txz|\\.bz2|\\.gz|\\.xz|\\.tar\\.bz2|\\.tar\\.gz|\\.tar\\.xz)$',
             '',
             output_name
         ) or "Archive"
