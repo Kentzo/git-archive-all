@@ -28,6 +28,10 @@ from __future__ import unicode_literals
 
 import logging
 from os import extsep, path, readlink
+try:
+    import pygit2
+except ImportError:
+    pygit2 = False
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
@@ -120,6 +124,10 @@ class GitArchiver(object):
         self.extra = extra
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
+        if pygit2:
+            self.repo = pygit2.Repository(main_repo_abspath + '/.git')
+        else:
+            self.repo = None
 
     def create(self, output_path, dry_run=False, output_format=None):
         """
@@ -195,6 +203,10 @@ class GitArchiver(object):
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
+        if pygit2:
+            return self.repo.get_attr(repo_file_path, 'export-ignore')
+
+        # Fallback to shelling out
         out = self.run_git_shell(
             'git check-attr -z export-ignore -- %s' % quote(repo_file_path),
             cwd=repo_abspath
