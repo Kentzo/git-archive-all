@@ -72,7 +72,7 @@ class GitArchiver(object):
         'gz': 'w:gz',
         'xz': 'w:xz'
     }
-    ZIPFILE_FORMATS = ('.zip',)
+    ZIPFILE_FORMATS = ('zip',)
 
     LOG = logging.getLogger('GitArchiver')
 
