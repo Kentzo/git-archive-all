@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+1.18.3 (2018-09-27)
+- Fix broken support for zip files
+
 1.18.2 (2018-09-19)
 -------------------
 
