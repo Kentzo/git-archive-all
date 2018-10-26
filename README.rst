@@ -18,7 +18,7 @@ Archive repository with all its submodules.
 
 ::
 
-    git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra] [--dry-run] OUTPUT_FILE
+    git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE
 
     Options:
 

@@ -121,7 +121,7 @@ class GitArchiver(object):
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
 
-    def create(self, output_path, dry_run=False, output_format=None):
+    def create(self, output_path, dry_run=False, output_format=None, compresslevel=None):
         """
         Create the archive at output_file_path.
 
@@ -147,7 +147,13 @@ class GitArchiver(object):
             if output_format in self.ZIPFILE_FORMATS:
                 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-                archive = ZipFile(path.abspath(output_path), 'w')
+                if sys.version_info > (3, 7):
+                    archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
+                else:
+                    if compresslevel is not None:
+                        raise ValueError("Compression level for zip archives requires Python 3.7+")
+
+                    archive = ZipFile(path.abspath(output_path), 'w')
 
                 def add_file(file_path, arcname):
                     if not path.islink(file_path):
@@ -161,7 +167,14 @@ class GitArchiver(object):
                 import tarfile
 
                 mode = self.TARFILE_FORMATS[output_format]
-                archive = tarfile.open(path.abspath(output_path), mode)
+
+                try:
+                    archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
+                except TypeError:
+                    if compresslevel is not None:
+                        raise ValueError("{0} cannot be compressed".format(output_format))
+
+                    archive = tarfile.open(path.abspath(output_path), mode)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
@@ -312,11 +325,11 @@ class GitArchiver(object):
 
 
 def main():
-    from optparse import OptionParser
+    from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
         usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              " [--extra EXTRA1 [EXTRA2]] [--dry-run] OUTPUT_FILE",
+              " [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
 
@@ -355,6 +368,13 @@ def main():
                       dest='dry_run',
                       help="don't actually archive anything, just show what would be done")
 
+    for i in range(10):
+        parser.add_option('-{0}'.format(i),
+                          action='store_const',
+                          const=i,
+                          dest='compresslevel',
+                          help=SUPPRESS_HELP)
+
     options, args = parser.parse_args()
 
     if len(args) != 1:
@@ -386,7 +406,7 @@ def main():
                                options.exclude,
                                options.force_sub,
                                options.extra)
-        archiver.create(output_file_path, options.dry_run)
+        archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
         parser.exit(2, "{0}\n".format(e))
 
