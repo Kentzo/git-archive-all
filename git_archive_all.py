@@ -121,6 +121,8 @@ class GitArchiver(object):
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
 
+        self._check_attr_gens = {}
+
     def create(self, output_path, dry_run=False, output_format=None, compresslevel=None):
         """
         Create the archive at output_file_path.
@@ -208,15 +210,9 @@ class GitArchiver(object):
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
-        out = self.run_git_shell(
-            'git check-attr -z export-ignore -- %s' % quote(repo_file_path),
-            cwd=repo_abspath
-        ).split('\0')
-
-        try:
-            return out[2] == 'set'
-        except IndexError:
-            return False
+        next(self._check_attr_gens[repo_abspath])
+        attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
+        return attrs['export-ignore'] == 'set'
 
     def archive_all_files(self, archiver):
         """
@@ -248,55 +244,73 @@ class GitArchiver(object):
         @rtype: Iterable
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        repo_file_paths = self.run_git_shell(
-            'git ls-files -z --cached --full-name --no-empty-directory',
-            repo_abspath
-        ).split('\0')[:-1]
-
-        for repo_file_path in repo_file_paths:
-            repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
-            main_repo_file_path = path.join(repo_path, repo_file_path)  # file path relative to the main repo
-
-            # Only list symlinks and files.
-            if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
-                continue
-
-            if self.is_file_excluded(repo_abspath, repo_file_path):
-                continue
-
-            yield main_repo_file_path
-
-        if self.force_sub:
-            self.run_git_shell('git submodule init', repo_abspath)
-            self.run_git_shell('git submodule update', repo_abspath)
+        assert repo_abspath not in self._check_attr_gens
+        self._check_attr_gens[repo_abspath] = self.check_attr(repo_abspath, ['export-ignore'])
 
         try:
-            repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
+            repo_file_paths = self.run_git_shell(
+                'git ls-files -z --cached --full-name --no-empty-directory',
+                repo_abspath
+            ).split('\0')[:-1]
 
-            with open(repo_gitmodules_abspath) as f:
-                lines = f.readlines()
+            for repo_file_path in repo_file_paths:
+                repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
+                main_repo_file_path = path.join(repo_path, repo_file_path)  # relative to main_repo_abspath
 
-            for l in lines:
-                m = re.match("^\\s*path\\s*=\\s*(.*)\\s*$", l)
+                # Only list symlinks and files.
+                if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
+                    continue
 
-                if m:
-                    repo_submodule_path = m.group(1)  # relative to repo_path
-                    main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
+                if self.is_file_excluded(repo_abspath, repo_file_path):
+                    continue
 
-                    if self.is_file_excluded(repo_abspath, repo_submodule_path):
-                        continue
+                yield main_repo_file_path
 
-                    for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
-                        repo_submodule_file_path = main_repo_submodule_file_path.replace(repo_path, "", 1).strip("/")
-                        if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
+            if self.force_sub:
+                self.run_git_shell('git submodule init', repo_abspath)
+                self.run_git_shell('git submodule update', repo_abspath)
+
+            try:
+                repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
+
+                with open(repo_gitmodules_abspath) as f:
+                    lines = f.readlines()
+
+                for l in lines:
+                    m = re.match("^\\s*path\\s*=\\s*(.*)\\s*$", l)
+
+                    if m:
+                        repo_submodule_path = m.group(1)  # relative to repo_path
+                        main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
+
+                        if self.is_file_excluded(repo_abspath, repo_submodule_path):
                             continue
 
-                        yield main_repo_submodule_file_path
-        except IOError:
-            pass
+                        for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
+                            repo_submodule_file_path = main_repo_submodule_file_path.replace(repo_path, "", 1).strip("/")  # relative to repo_path
+                            if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
+                                continue
 
-    @staticmethod
-    def run_git_shell(cmd, cwd=None):
+                            yield main_repo_submodule_file_path
+            except IOError:
+                pass
+        finally:
+            self._check_attr_gens[repo_abspath].close()
+            del self._check_attr_gens[repo_abspath]
+
+    @classmethod
+    def decode_git_output(cls, output):
+        """
+        Decode Git's binary output handeling the way it escapes unicode characters.
+
+        @type output: bytes
+
+        @rtype: str
+        """
+        return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+
+    @classmethod
+    def run_git_shell(cls, cmd, cwd=None):
         """
         Runs git shell command, reads output and decodes it into unicode string.
 
@@ -313,7 +327,7 @@ class GitArchiver(object):
         """
         p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
         output, _ = p.communicate()
-        output = output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+        output = cls.decode_git_output(output)
 
         if p.returncode:
             if sys.version_info > (2, 6):
@@ -322,6 +336,75 @@ class GitArchiver(object):
                 raise CalledProcessError(returncode=p.returncode, cmd=cmd)
 
         return output
+
+    @classmethod
+    def check_attr(cls, repo_abspath, attrs):
+        """
+        Generator that returns attributes for given paths relative to repo_abspath.
+
+        >>> g = GitArchiver.check_attr('repo_path', ['export-ignore'])
+        >>> next(g)
+        >>> attrs = g.send('relative_path')
+        >>> print(attrs['export-ignore'])
+
+        @param repo_abspath: Absolute path to a git repository.
+        @type repo_abspath: str
+
+        @param attrs: Attributes to check.
+        @type attrs: [str]
+
+        @rtype: generator
+        """
+        def make_process():
+            cmd = 'GIT_FLUSH=1 git check-attr --stdin -z {0}'.format(' '.join(attrs))
+            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath)
+
+        def read_attrs(process, repo_file_path):
+            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.flush()
+
+            # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
+            path, attr, info = b'', b'', b''
+            nuls_count = 0
+            nuls_expected = 3 * len(attrs)
+
+            while nuls_count != nuls_expected:
+                b = process.stdout.read(1)
+
+                if b == b'' and process.poll() is not None:
+                    raise RuntimeError("check-attr exited prematurely")
+                elif b == b'\0':
+                    nuls_count += 1
+
+                    if nuls_count % 3 == 0:
+                        yield map(cls.decode_git_output, (path, attr, info))
+                        path, attr, info = b'', b'', b''
+                elif nuls_count % 3 == 0:
+                    path += b
+                elif nuls_count % 3 == 1:
+                    attr += b
+                elif nuls_count % 3 == 2:
+                    info += b
+
+        if not attrs:
+            return
+
+        process = make_process()
+
+        try:
+            while True:
+                repo_file_path = yield
+                repo_file_attrs = {}
+
+                for path, attr, value in read_attrs(process, repo_file_path):
+                    assert path == repo_file_path
+                    assert attr in attrs
+                    repo_file_attrs[attr] = value
+
+                yield repo_file_attrs
+        finally:
+            process.stdin.close()
+            process.wait()
 
 
 def main():
