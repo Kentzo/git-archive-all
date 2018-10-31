@@ -1,7 +1,16 @@
 CHANGES
 =======
 
+1.19.0 (2018-10-31)
+-------------------
+
+- 🎃
+- Use -0 ... -9 to explicitly specify compression level if format allows; if unset, lib's default is used
+- Checking for file exclusion is optimized, the process is spawned only once per repo / submodule
+
 1.18.3 (2018-09-27)
+-------------------
+
 - Fix broken support for zip files
 
 1.18.2 (2018-09-19)
