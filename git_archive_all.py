@@ -149,15 +149,12 @@ class GitArchiver(object):
             if output_format in self.ZIPFILE_FORMATS:
                 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-                if sys.version_info > (3, 7):
-                    if compresslevel is not None:
+                if compresslevel is not None:
+                    if sys.version_info > (3, 7):
                         archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
                     else:
-                        archive = ZipFile(path.abspath(output_path), 'w')
-                else:
-                    if compresslevel is not None:
                         raise ValueError("Compression level for zip archives requires Python 3.7+")
-
+                else:
                     archive = ZipFile(path.abspath(output_path), 'w')
 
                 def add_file(file_path, arcname):
@@ -173,15 +170,12 @@ class GitArchiver(object):
 
                 mode = self.TARFILE_FORMATS[output_format]
 
-                try:
-                    if compresslevel is not None:
+                if compresslevel is not None:
+                    try:
                         archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
-                    else:
-                        archive = tarfile.open(path.abspath(output_path), mode)
-                except TypeError:
-                    if compresslevel is not None:
+                    except TypeError:
                         raise ValueError("{0} cannot be compressed".format(output_format))
-
+                else:
                     archive = tarfile.open(path.abspath(output_path), mode)
 
                 def add_file(file_path, arcname):
