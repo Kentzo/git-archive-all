@@ -13,6 +13,10 @@ CHANGES
 - Use -0 ... -9 to explicitly specify compression level if format allows; if unset, lib's default is used
 - Checking for file exclusion is optimized, the process is spawned only once per repo / submodule
 
+**Known Bugs:**
+
+- Not passing a compression level explicitly `[-0 | ... | -9]` may cause a segfault. See #59
+
 1.18.3 (2018-09-27)
 -------------------
 
