@@ -150,7 +150,10 @@ class GitArchiver(object):
                 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
                 if sys.version_info > (3, 7):
-                    archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
+                    if compresslevel is not None:
+                        archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
+                    else:
+                        archive = ZipFile(path.abspath(output_path), 'w')
                 else:
                     if compresslevel is not None:
                         raise ValueError("Compression level for zip archives requires Python 3.7+")
@@ -171,7 +174,10 @@ class GitArchiver(object):
                 mode = self.TARFILE_FORMATS[output_format]
 
                 try:
-                    archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
+                    if compresslevel is not None:
+                        archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
+                    else:
+                        archive = tarfile.open(path.abspath(output_path), mode)
                 except TypeError:
                     if compresslevel is not None:
                         raise ValueError("{0} cannot be compressed".format(output_format))
