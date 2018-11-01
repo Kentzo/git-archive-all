@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+1.19.1 (2018-11-01)
+-------------------
+
+- Fix passing compresslevel=None may cause segfault on some systems
+
 1.19.0 (2018-10-31)
 -------------------
 
