@@ -390,6 +390,24 @@ def test_explicitly_excluded_dir(base_repo, tmpdir, git_env):
         repo_tar.getmember('lib/extra/__init__.py')
 
 
+@pytest.mark.parametrize('format', [
+    'tar',
+    'tar.bz2',
+    'tar.gz',
+    pytest.param('tar.xz', marks=pytest.mark.skipif(sys.version_info < (3, 3), reason="Requires lzma")),
+    'tbz2',
+    'tgz',
+    pytest.param('txz', marks=pytest.mark.skipif(sys.version_info < (3, 3), reason="Requires lzma")),
+    'zip',
+    'bz2',
+    'gz',
+    pytest.param('xz', marks=pytest.mark.skipif(sys.version_info < (3, 3), reason="Requires lzma")),
+])
+def test_formats(base_repo, tmpdir, format):
+    repo_archive_path = os.path.join(str(tmpdir), 'repo.' + format)
+    base_repo.archive(repo_archive_path)
+
+
 def test_pycodestyle():
     style = pycodestyle.StyleGuide(repeat=True, max_line_length=240)
     report = style.check_files(['git_archive_all.py'])
