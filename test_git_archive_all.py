@@ -123,8 +123,8 @@ class Repo:
     def commit(self, message):
         check_call(['git', 'commit', '-m', 'init'], cwd=self.path, env=self.git_env)
 
-    def archive(self, path):
-        a = GitArchiver(main_repo_abspath=self.path)
+    def archive(self, path, include=None, exclude=None):
+        a = GitArchiver(main_repo_abspath=self.path, include=include, exclude=exclude)
         a.create(path)
 
 
@@ -265,7 +265,7 @@ quote_quoted['data'] = DirRecord({
     pytest.param(quote_base, id="Quote"),
     pytest.param(quote_quoted, id="Quote (Quoted)")
 ])
-def test_ignore(contents, tmpdir, git_env):
+def test_export_ignore(contents, tmpdir, git_env):
     """
     Ensure that GitArchiver respects export-ignore.
     """
@@ -311,6 +311,95 @@ def test_ignore(contents, tmpdir, git_env):
     actual = make_actual(repo_tar)
 
     assert actual == expected
+
+
+@pytest.mark.parametrize('name', [
+    pytest.param('repo ', id='Trailing space'),
+])
+def test_repo_dirs_with_trailing_whitespaces(name, tmpdir, git_env):
+    repo_path = os.path.join(str(tmpdir), name)
+    repo = Repo(repo_path, git_env)
+    repo.init()
+    repo.add_dir('.', base)
+    repo.commit('init')
+
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo.archive(repo_tar_path)
+
+
+def test_explicitly_included_file(tmpdir, git_env):
+    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo = Repo(repo_path, git_env)
+    repo.init()
+    repo.add_dir('.', base)
+    repo.commit('init')
+
+    file_path = os.path.join(repo_path, 'include')
+    with open(file_path, 'w') as f:
+        f.write('Hello')
+
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo.archive(repo_tar_path, include=['include'])
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+
+    repo_tar.getmember('include')
+
+
+def test_explicitly_included_dir(tmpdir, git_env):
+    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo = Repo(repo_path, git_env)
+    repo.init()
+    repo.add_dir('.', base)
+    repo.commit('init')
+
+    dir_path = os.path.join(repo_path, 'include_dir')
+    makedirs(dir_path)
+    file_path = os.path.join(dir_path, 'include_file')
+    with open(file_path, 'w') as f:
+        f.write('Hello')
+
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo.archive(repo_tar_path, include=['include_dir'])
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+
+    repo_tar.getmember('include_dir/include_file')
+
+
+def test_explicitly_excluded_file(tmpdir, git_env):
+    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo = Repo(repo_path, git_env)
+    repo.init()
+    repo.add_dir('.', base)
+    repo.commit('init')
+
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo.archive(repo_tar_path, exclude=['app/__init__.py'])
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+
+    repo_tar.getmember('lib/__init__.py')
+
+    with pytest.raises(KeyError):
+        repo_tar.getmember('app/__init__.py')
+
+
+def test_explicitly_excluded_dir(tmpdir, git_env):
+    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo = Repo(repo_path, git_env)
+    repo.init()
+    repo.add_dir('.', base)
+    repo.commit('init')
+
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo.archive(repo_tar_path, exclude=['lib'])
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+
+    repo_tar.getmember('app/__init__.py')
+
+    with pytest.raises(KeyError):
+        repo_tar.getmember('lib/__init__.py')
+
+    with pytest.raises(KeyError):
+        repo_tar.getmember('lib/extra/__init__.py')
 
 
 def test_pycodestyle():
