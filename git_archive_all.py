@@ -27,7 +27,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
-from os import extsep, path, readlink
+from os import extsep, path, readlink, walk
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
@@ -76,7 +76,17 @@ class GitArchiver(object):
 
     LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+    def __init__(
+            self,
+            prefix='',
+            _exclude=None,  # use ignore_gitattributes instead
+            force_submodules=None,
+            include=None,
+            main_repo_abspath=None,
+            exclude=None,
+            ignore_gitattributes=None,
+            ignore_uninitialized_submodules=None,
+            **kwargs):
         """
         @param prefix: Prefix used to prepend all paths in the resulting archive.
             Extra file paths are only prefixed if they are not relative.
@@ -87,39 +97,103 @@ class GitArchiver(object):
                 bar
         @type prefix: str
 
-        @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
-        @type exclude: bool
+        @param force_submodules: Whether submodules are initialized and updated before archiving.
+            Defaults to False
+        @type force_submodules: bool
 
-        @param force_sub: Determines whether submodules are initialized and updated before archiving.
-        @type force_sub: bool
-
-        @param extra: List of extra paths to include in the resulting archive.
-        @type extra: list
+        @param include: List of extra paths to include in the resulting archive.
+            Relative paths are resolved against main_repo_abspath.
+        @type include: [str] or None
 
         @param main_repo_abspath: Absolute path to the main repository (or one of subdirectories).
-            If given path is path to a subdirectory (but not a submodule directory!) it will be replaced
-            with abspath to top-level directory of the repository.
-            If None, current cwd is used.
-        @type main_repo_abspath: str
+            If given path is a path to a subdirectory (but not a submodule directory!) it will be replaced
+            with abspath to a top-level directory of the repository.
+            Defaults to the current working directory.
+        @type main_repo_abspath: str or None
+
+        @param exclude: List of extra paths to exclude from the resulting archive.
+            Relative paths are resolved against main_repo_abspath.
+        @type exclude: [str] or None
+
+        @param ignore_gitattributes: Whether archiver should follow rules specified in .gitattributes files.
+            Defaults to False.
+        @type ignore_gitattributes: bool
+
+        @param ignore_uninitialized_submodules: Whether archiver should ignore uninitialized submodules.
+            Defaults to False.
+        @type ignore_uninitialized_submodules: bool
         """
-        if extra is None:
-            extra = []
+        if force_submodules is None:
+            force_submodules = None
+
+        if ignore_uninitialized_submodules is None:
+            ignore_uninitialized_submodules = False
+
+        if include is None:
+            include = []
+
+        if exclude is None:
+            exclude = []
+
+        # Backward compatibility with 1.19-
+        if isinstance(exclude, bool):
+            self.LOG.warning("The exclude keyword argument is now reserved for files exclusion."
+                             " Use ignore_gitattributes instead.")
+            ignore_gitattributes = exclude
+            exclude = None
+
+        if _exclude is not None:
+            self.LOG.warning("The exclude positional argument is deprecated,"
+                             " use the ignore_gitattributes keyword argument instead.")
+
+            if ignore_gitattributes is None:
+                ignore_gitattributes = _exclude
+            else:
+                raise TypeError("cannot set ignore_gitattributes keyword argument"
+                                " and _exclude positional argument at the same time")
+
+        if 'extra' in kwargs and kwargs['extra']:
+            self.LOG.warning("The extra keyword argument is deprecated,"
+                             " use the include keyword argument instead.")
+            include.extend(kwargs['extra'])
+
+        if 'force_sub' in kwargs:
+            self.LOG.warning("The force_sub keyword argument is deprecated,"
+                             " use the force_submodules keyword argument instead.")
+            force_submodules = kwargs['force_sub']
 
         if main_repo_abspath is None:
             main_repo_abspath = path.abspath('')
         elif not path.isabs(main_repo_abspath):
             raise ValueError("main_repo_abspath must be an absolute path")
 
+        def abspath(p):
+            return path.normpath(path.join(main_repo_abspath, p))
+
+        exclude = [abspath(p) for p in exclude]
+        self.excluded_dirs = [p + path.sep for p in exclude if path.isdir(p)]
+        self.excluded_files = [p for p in exclude if path.isfile(p)]
+
+        self.included_dirs = []
+        self.included_files = []
+        for file_path in include:
+            file_abspath = abspath(file_path)
+
+            if path.isdir(file_abspath):
+                self.included_dirs.append(file_abspath)
+            elif path.isfile(file_abspath):
+                self.included_files.append(file_abspath)
+
         try:
-            main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
+            self.main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath)[:-1])
         except CalledProcessError:
             raise ValueError("{0} is not part of a git repository".format(main_repo_abspath))
 
         self.prefix = prefix
-        self.exclude = exclude
-        self.extra = extra
-        self.force_sub = force_sub
-        self.main_repo_abspath = main_repo_abspath
+        self.force_submodules = force_submodules
+
+        self.ignore_gitattributes = ignore_gitattributes
+        self.ignore_uninitialized_submodules = ignore_uninitialized_submodules
 
         self._check_attr_gens = {}
 
@@ -143,7 +217,7 @@ class GitArchiver(object):
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is %s.", output_format)
 
         if not dry_run:
             if output_format in self.ZIPFILE_FORMATS:
@@ -184,13 +258,13 @@ class GitArchiver(object):
                 raise ValueError("unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("{0} => {1}".format(file_path, arcname))
+                self.LOG.debug("%s => %s", file_path, arcname)
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info("{0} => {1}".format(file_path, arcname))
+                self.LOG.info("%s => %s", file_path, arcname)
 
         self.archive_all_files(archiver)
 
@@ -210,23 +284,55 @@ class GitArchiver(object):
         @return: True if file should be excluded. Otherwise False.
         @rtype: bool
         """
-        next(self._check_attr_gens[repo_abspath])
-        attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
-        return attrs['export-ignore'] == 'set'
+        repo_file_abspath = path.join(repo_abspath, repo_file_path)
+
+        if self.excluded_files or self.excluded_dirs:
+            if repo_file_abspath in self.excluded_files or repo_file_abspath in self.excluded_dirs:
+                self.LOG.debug("%s is excluded explicitly.", repo_file_abspath)
+                return True
+            elif self.excluded_dirs:
+                for d in self.excluded_dirs:
+                    if repo_file_abspath.startswith(d):
+                        self.LOG.debug("%s is inside explicitly excluded directory %s.", repo_file_abspath, d)
+                        return True
+
+        if not self.ignore_gitattributes:
+            next(self._check_attr_gens[repo_abspath])
+            attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
+
+            if attrs['export-ignore'] == 'set':
+                self.LOG.debug("%s is excluded via .gitattributes", repo_file_abspath)
+                return True
+
+        return False
 
     def archive_all_files(self, archiver):
         """
         Archive all files using archiver.
 
         @param archiver: Callable that accepts 2 arguments:
-            abspath to file on the system and relative path within archive.
+            abspath to a file in the file system and relative path within archive.
         @type archiver: Callable
         """
-        for file_path in self.extra:
-            archiver(path.abspath(file_path), path.join(self.prefix, file_path))
+        def arcpath(p):
+            if p.startswith(self.main_repo_abspath + path.sep):
+                return path.join(self.prefix, path.relpath(p, self.main_repo_abspath))
+            else:
+                return path.join(self.prefix, p)
 
-        for file_path in self.walk_git_files():
-            archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
+        for file_abspath in self.included_files:
+            self.LOG.debug("%s is included explicitly.", file_abspath)
+            archiver(file_abspath, arcpath(file_abspath))
+
+        for dir_abspath in self.included_dirs:
+            for subdir_abspath, _, filenames in walk(dir_abspath):
+                for file_path in filenames:
+                    file_abspath = path.join(subdir_abspath, file_path)
+                    self.LOG.debug("%s is inside explicitly included directory %s.", file_abspath, dir_abspath)
+                    archiver(file_abspath, arcpath(file_abspath))
+
+        for main_repo_file_path in self.walk_git_files():
+            archiver(path.join(self.main_repo_abspath, main_repo_file_path), path.join(self.prefix, main_repo_file_path))
 
     def walk_git_files(self, repo_path=''):
         """
@@ -244,8 +350,10 @@ class GitArchiver(object):
         @rtype: Iterable
         """
         repo_abspath = path.join(self.main_repo_abspath, repo_path)
-        assert repo_abspath not in self._check_attr_gens
-        self._check_attr_gens[repo_abspath] = self.check_attr(repo_abspath, ['export-ignore'])
+
+        if not self.ignore_gitattributes:
+            assert repo_abspath not in self._check_attr_gens
+            self._check_attr_gens[repo_abspath] = self.check_attr(repo_abspath, ['export-ignore'])
 
         try:
             repo_file_paths = self.run_git_shell(
@@ -266,7 +374,7 @@ class GitArchiver(object):
 
                 yield main_repo_file_path
 
-            if self.force_sub:
+            if self.force_submodules:
                 self.run_git_shell('git submodule init', repo_abspath)
                 self.run_git_shell('git submodule update', repo_abspath)
 
@@ -281,9 +389,16 @@ class GitArchiver(object):
 
                     if m:
                         repo_submodule_path = m.group(1)  # relative to repo_path
-                        main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
                         if self.is_file_excluded(repo_abspath, repo_submodule_path):
+                            continue
+
+                        main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
+                        main_repo_submodule_abspath = path.join(self.main_repo_abspath, main_repo_submodule_path)
+
+                        if not path.exists(main_repo_submodule_abspath) and self.ignore_uninitialized_submodules:
+                            self.LOG.debug("The %s submodule does not exist, but uninitialized submodules are ignored.",
+                                           main_repo_submodule_abspath)
                             continue
 
                         for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
@@ -411,10 +526,20 @@ def main():
     from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
-        usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              " [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
+        usage="usage: %prog [-v] [--dry-run] [--prefix PREFIX] [--ignore-gitattributes] [--ignore-uninitialized-submodules] [--force-submodules]"
+              " [--include FILE1 [--include FILE2 ...]] [--exclude FILE1 [--exclude FILE2 ...]] [-0 | ... | -9] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
+
+    parser.add_option('-v', '--verbose',
+                      action='store_true',
+                      dest='verbose',
+                      help='enable verbose mode')
+
+    parser.add_option('--dry-run',
+                      action='store_true',
+                      dest='dry_run',
+                      help="don't actually archive anything, just show what would be done")
 
     parser.add_option('--prefix',
                       type='string',
@@ -424,32 +549,46 @@ def main():
                           OUTPUT_FILE name is used by default to avoid tarbomb.
                           You can set it to '' in order to explicitly request tarbomb""")
 
-    parser.add_option('-v', '--verbose',
+    parser.add_option('--ignore-gitattributes',
                       action='store_true',
-                      dest='verbose',
-                      help='enable verbose mode')
+                      dest='ignore_gitattributes',
+                      default=False,
+                      help="ignore the export-ignore attribute in .gitattributes")
 
-    parser.add_option('--no-exclude',
-                      action='store_false',
-                      dest='exclude',
-                      default=True,
-                      help="don't read .gitattributes files for patterns containing export-ignore attrib")
+    parser.add_option('--ignore-uninitialized-submodules',
+                      action='store_true',
+                      dest='ignore_uninitialized_submodules',
+                      default=False,
+                      help="ignore uninitialized submodules instead of failing with error")
 
     parser.add_option('--force-submodules',
                       action='store_true',
-                      dest='force_sub',
-                      help='force a git submodule init && git submodule update at each level before iterating submodules')
+                      dest='force_submodules',
+                      help="""force a git submodule init && git submodule update at
+                           each level before iterating submodules""")
 
-    parser.add_option('--extra',
+    parser.add_option('--include',
                       action='append',
-                      dest='extra',
+                      dest='include',
                       default=[],
                       help="any additional files to include in the archive")
 
-    parser.add_option('--dry-run',
+    parser.add_option('--exclude',
+                      action='append',
+                      dest='exclude',
+                      default=[],
+                      help="any additional files to exclude from the archive")
+
+    parser.add_option('--no-exclude',
                       action='store_true',
-                      dest='dry_run',
-                      help="don't actually archive anything, just show what would be done")
+                      dest='ignore_gitattributes',
+                      help=SUPPRESS_HELP)
+
+    parser.add_option('--extra',
+                      action='append',
+                      dest='include',
+                      default=[],
+                      help=SUPPRESS_HELP)
 
     for i in range(10):
         parser.add_option('-{0}'.format(i),
@@ -485,10 +624,12 @@ def main():
         handler.setFormatter(logging.Formatter('%(message)s'))
         GitArchiver.LOG.addHandler(handler)
         GitArchiver.LOG.setLevel(logging.DEBUG if options.verbose else logging.INFO)
-        archiver = GitArchiver(options.prefix,
-                               options.exclude,
-                               options.force_sub,
-                               options.extra)
+        archiver = GitArchiver(prefix=options.prefix,
+                               ignore_gitattributes=options.ignore_gitattributes,
+                               ignore_uninitialized_submodules=options.ignore_uninitialized_submodules,
+                               force_submodules=options.force_submodules,
+                               include=options.include,
+                               exclude=options.exclude)
         archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
         parser.exit(2, "{0}\n".format(e))

@@ -1,6 +1,17 @@
 CHANGES
 =======
 
+1.20.0
+------
+
+- `--no-exclude` -> `--ignore-gitattributes`
+- `--extra` -> `--include`
+- `--include` now recognizes directories and includes their content
+- New option `--exclude` allows to exclude both files and directories
+- New option `--ignore-uninitialized-submodules` allows to proceed if repo has uninitialized submodules
+  as if their directories were excluded
+- Signature of `GitArchiver.__init__` was changed. Deprecated arguments will be removed in the next release
+
 1.19.1 (2018-11-01)
 -------------------
 
