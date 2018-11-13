@@ -1,9 +1,11 @@
 environment:
   matrix:
-    - PYTHON: "C:\\Python26"
-    - PYTHON: "C:\\Python26-x64"
-    - PYTHON: "C:\\Python27"
-    - PYTHON: "C:\\Python27-x64"
+#    Python 2.6 builds do not work because bundled OpenSSL does not support TLS.
+#    - PYTHON: "C:\\Python26"
+#    - PYTHON: "C:\\Python26-x64"
+#    Python 2.x builds do not work, because readlink for Windows is not available before Python 3.3
+#    - PYTHON: "C:\\Python27"
+#    - PYTHON: "C:\\Python27-x64"
     - PYTHON: "C:\\Python34"
     - PYTHON: "C:\\Python34-x64"
     - PYTHON: "C:\\Python35"
