@@ -34,9 +34,10 @@ def git_env(tmpdir_factory):
     2. Custom git user
     3. .gitmodules file is ignored by default
     """
-    e = deepcopy(os.environ)
-    e['GIT_CONFIG_NOSYSTEM'] = 'true'
-    e['HOME'] = str(tmpdir_factory.getbasetemp())
+    e = {
+        'GIT_CONFIG_NOSYSTEM': 'true',
+        'HOME': str(tmpdir_factory.getbasetemp())
+    }
 
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('w+') as f:
         f.writelines([
@@ -74,9 +75,8 @@ SubmoduleRecord = partial(Record, 'submodule', excluded=False)
 
 
 class Repo:
-    def __init__(self, path, git_env):
+    def __init__(self, path):
         self.path = os.path.abspath(path)
-        self.git_env = git_env
 
     def init(self):
         os.mkdir(self.path)
@@ -98,7 +98,7 @@ class Repo:
         with open(file_path, 'w') as f:
             f.write(contents)
 
-        check_call(['git', 'add', file_path], cwd=self.path, env=self.git_env)
+        check_call(['git', 'add', file_path], cwd=self.path)
         return file_path
 
     def add_dir(self, rel_path, contents):
@@ -108,20 +108,20 @@ class Repo:
         for k, v in contents.items():
             self.add(os.path.join(dir_path, k), v)
 
-        check_call(['git', 'add', dir_path], cwd=self.path, env=self.git_env)
+        check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
 
     def add_submodule(self, rel_path, contents):
         submodule_path = os.path.join(self.path, rel_path)
-        r = Repo(submodule_path, self.git_env)
+        r = Repo(submodule_path)
         r.init()
         r.add_dir('.', contents)
         r.commit('init')
-        check_call(['git', 'submodule', 'add', submodule_path], cwd=self.path, env=self.git_env)
+        check_call(['git', 'submodule', 'add', submodule_path], cwd=self.path)
         return submodule_path
 
     def commit(self, message):
-        check_call(['git', 'commit', '-m', 'init'], cwd=self.path, env=self.git_env)
+        check_call(['git', 'commit', '-m', 'init'], cwd=self.path)
 
     def archive(self, path):
         a = GitArchiver(main_repo_abspath=self.path)
@@ -265,12 +265,15 @@ quote_quoted['data'] = DirRecord({
     pytest.param(quote_base, id="Quote"),
     pytest.param(quote_quoted, id="Quote (Quoted)")
 ])
-def test_ignore(contents, tmpdir, git_env):
+def test_ignore(contents, tmpdir, git_env, monkeypatch):
     """
     Ensure that GitArchiver respects export-ignore.
     """
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
+
     repo_path = os.path.join(str(tmpdir), 'repo')
-    repo = Repo(repo_path, git_env)
+    repo = Repo(repo_path)
     repo.init()
     repo.add_dir('.', contents)
     repo.commit('init')
