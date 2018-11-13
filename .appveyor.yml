@@ -17,5 +17,10 @@ environment:
 
 build: off
 
+install:
+  - "%PYTHON%\\python.exe -m pip install --upgrade pip"
+  - "%PYTHON%\\python.exe -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0"
+
 test_script:
-  - "%PYTHON%\\python.exe -m setup.py test"
+  - "%PYTHON%\\python.exe -m pip install -r requirements.txt"
+  - "%PYTHON%\\python.exe setup.py test"
