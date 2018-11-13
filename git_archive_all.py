@@ -27,7 +27,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import logging
-from os import extsep, path, readlink
+from os import environ, extsep, path, readlink
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
@@ -356,8 +356,9 @@ class GitArchiver(object):
         @rtype: generator
         """
         def make_process():
-            cmd = 'GIT_FLUSH=1 git check-attr --stdin -z {0}'.format(' '.join(attrs))
-            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath)
+            env = dict(environ, GIT_FLUSH='1')
+            cmd = 'git check-attr --stdin -z {0}'.format(' '.join(attrs))
+            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
         def read_attrs(process, repo_file_path):
             process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
