@@ -35,6 +35,6 @@ setup(
     version=verstr,
     py_modules=['git_archive_all'],
     entry_points={'console_scripts': 'git-archive-all=git_archive_all:main'},
-    tests_require=['pytest', 'pytest-cov'],
+    tests_require=['pytest', 'pytest-cov', 'pycodestyle'],
     cmdclass={"test": PyTest},
 )
