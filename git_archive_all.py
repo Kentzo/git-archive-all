@@ -287,7 +287,7 @@ class GitArchiver(object):
                             continue
 
                         for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
-                            repo_submodule_file_path = main_repo_submodule_file_path.replace(repo_path, "", 1).strip("/")  # relative to repo_path
+                            repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
                             if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
                                 continue
 
@@ -398,8 +398,6 @@ class GitArchiver(object):
                 repo_file_attrs = {}
 
                 for path, attr, value in read_attrs(process, repo_file_path):
-                    assert path == repo_file_path
-                    assert attr in attrs
                     repo_file_attrs[attr] = value
 
                 yield repo_file_attrs

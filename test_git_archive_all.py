@@ -25,6 +25,13 @@ def makedirs(p):
             raise
 
 
+def as_posix(p):
+    if sys.platform.startswith('win32'):
+        return str(p).replace('\\', '/')
+    else:
+        return str(p)
+
+
 @pytest.fixture
 def git_env(tmpdir_factory):
     """
@@ -42,7 +49,7 @@ def git_env(tmpdir_factory):
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('w+') as f:
         f.writelines([
             '[core]\n',
-            'attributesfile = {0}/.gitattributes\n'.format(tmpdir_factory.getbasetemp()),
+            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes'))),
             '[user]\n',
             'name = git-archive-all\n',
             'email = git-archive-all@example.com\n',
@@ -98,7 +105,7 @@ class Repo:
         with open(file_path, 'w') as f:
             f.write(contents)
 
-        check_call(['git', 'add', file_path], cwd=self.path)
+        check_call(['git', 'add', as_posix(os.path.normpath(file_path))], cwd=self.path)
         return file_path
 
     def add_dir(self, rel_path, contents):
@@ -106,7 +113,7 @@ class Repo:
         makedirs(dir_path)
 
         for k, v in contents.items():
-            self.add(os.path.join(dir_path, k), v)
+            self.add(as_posix(os.path.normpath(os.path.join(dir_path, k))), v)
 
         check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
@@ -117,7 +124,7 @@ class Repo:
         r.init()
         r.add_dir('.', contents)
         r.commit('init')
-        check_call(['git', 'submodule', 'add', submodule_path], cwd=self.path)
+        check_call(['git', 'submodule', 'add', as_posix(os.path.normpath(submodule_path))], cwd=self.path)
         return submodule_path
 
     def commit(self, message):
@@ -250,7 +257,7 @@ quote_quoted['data'] = DirRecord({
 
 @pytest.mark.parametrize('contents', [
     pytest.param(base, id='No Ignore'),
-    pytest.param(base_quoted, id='No Ignore (Quoted)'),
+    pytest.param(base_quoted, id='No Ignore (Quoted)', marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
     pytest.param(ignore_in_root, id='Ignore in Root'),
     pytest.param(ignore_in_submodule, id='Ignore in Submodule'),
     pytest.param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
@@ -259,11 +266,11 @@ quote_quoted['data'] = DirRecord({
     pytest.param(ignore_in_nested_submodule_from_submodule, id='Ignore in Nested Submodule from Submodule'),
     pytest.param(unset_export_ignore, id='-export-ignore'),
     pytest.param(unicode_base, id='No Ignore (Unicode)'),
-    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)'),
+    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)', marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
     pytest.param(brackets_base, id='Brackets'),
-    pytest.param(brackets_quoted, id="Brackets (Quoted)"),
-    pytest.param(quote_base, id="Quote"),
-    pytest.param(quote_quoted, id="Quote (Quoted)")
+    pytest.param(brackets_quoted, id="Brackets (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
+    pytest.param(quote_base, id="Quote", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
+    pytest.param(quote_quoted, id="Quote (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename."))
 ])
 def test_ignore(contents, tmpdir, git_env, monkeypatch):
     """
@@ -290,7 +297,7 @@ def test_ignore(contents, tmpdir, git_env, monkeypatch):
                 e[k] = v.contents
             elif v.kind in ('dir', 'submodule') and not v.excluded:
                 for nested_k, nested_v in make_expected(v.contents).items():
-                    e[os.path.join(k, nested_k)] = nested_v
+                    e[as_posix(os.path.join(k, nested_k))] = nested_v
 
         return e
 
