@@ -1,6 +1,9 @@
 .. image:: https://img.shields.io/pypi/v/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: PyPI
+.. image:: https://img.shields.io/homebrew/v/git-archive-all.svg
+    :target: https://formulae.brew.sh/formula/git-archive-all
+    :alt: Homebrew
 .. image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
     :target: https://travis-ci.org/Kentzo/git-archive-all
     :alt: Travis
