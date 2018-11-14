@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+1.19.2 (2018-11-13)
+-------------------
+
+- Support Windows
+- Fix missing pycodestyle in setup.py's tests_require
+
 1.19.1 (2018-11-01)
 -------------------
 
