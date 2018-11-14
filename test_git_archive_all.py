@@ -26,10 +26,15 @@ def makedirs(p):
 
 
 def as_posix(p):
-    if sys.platform.startswith('win32'):
-        return str(p).replace('\\', '/')
+    if sys.version_info < (3,):
+        str_p = unicode(p)
     else:
-        return str(p)
+        str_p = str(p)
+
+    if sys.platform.startswith('win32'):
+        str_p = str_p.replace('\\', '/')
+
+    return str_p
 
 
 @pytest.fixture
