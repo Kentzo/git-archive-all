@@ -76,7 +76,7 @@ class GitArchiver(object):
 
     LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None):
+    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None, git_version=None):
         """
         @param prefix: Prefix used to prepend all paths in the resulting archive.
             Extra file paths are only prefixed if they are not relative.
@@ -101,7 +101,17 @@ class GitArchiver(object):
             with abspath to top-level directory of the repository.
             If None, current cwd is used.
         @type main_repo_abspath: str
+
+        @param git_version: Version of Git that determines whether various workarounds are on.
+            If None, tries to resolve via Git's CLI.
+        @type git_version: tuple or None
         """
+        if git_version is None:
+            git_version = self.get_git_version()
+
+        if git_version is not None and git_version < (1, 6, 1):
+            raise ValueError("git of version 1.6.1 and higher is required")
+
         if extra is None:
             extra = []
 
@@ -120,6 +130,7 @@ class GitArchiver(object):
         self.extra = extra
         self.force_sub = force_sub
         self.main_repo_abspath = main_repo_abspath
+        self.git_version = git_version
 
         self._check_attr_gens = {}
 
@@ -298,6 +309,110 @@ class GitArchiver(object):
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
 
+    def check_attr(self, repo_abspath, attrs):
+        """
+        Generator that returns attributes for given paths relative to repo_abspath.
+
+        >>> g = GitArchiver.check_attr('repo_path', ['export-ignore'])
+        >>> next(g)
+        >>> attrs = g.send('relative_path')
+        >>> print(attrs['export-ignore'])
+
+        @param repo_abspath: Absolute path to a git repository.
+        @type repo_abspath: str
+
+        @param attrs: Attributes to check.
+        @type attrs: [str]
+
+        @rtype: generator
+        """
+        def make_process():
+            env = dict(environ, GIT_FLUSH='1')
+            cmd = 'git check-attr --stdin -z {0}'.format(' '.join(attrs))
+            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
+
+        def read_attrs(process, repo_file_path):
+            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.flush()
+
+            # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
+            path, attr, info = b'', b'', b''
+            nuls_count = 0
+            nuls_expected = 3 * len(attrs)
+
+            while nuls_count != nuls_expected:
+                b = process.stdout.read(1)
+
+                if b == b'' and process.poll() is not None:
+                    raise RuntimeError("check-attr exited prematurely")
+                elif b == b'\0':
+                    nuls_count += 1
+
+                    if nuls_count % 3 == 0:
+                        yield map(self.decode_git_output, (path, attr, info))
+                        path, attr, info = b'', b'', b''
+                elif nuls_count % 3 == 0:
+                    path += b
+                elif nuls_count % 3 == 1:
+                    attr += b
+                elif nuls_count % 3 == 2:
+                    info += b
+
+        def read_attrs_old(process, repo_file_path):
+            """
+            Compatibility with versions 1.8.5 and below that do not recognize -z for output.
+            """
+            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.flush()
+
+            # For every attribute check-attr will output: <path>: <attribute>: <info>\n
+            # where <path> is c-quoted
+
+            path, attr, info = b'', b'', b''
+            lines_count = 0
+            lines_expected = len(attrs)
+
+            while lines_count != lines_expected:
+                line = process.stdout.readline()
+
+                info_start = line.rfind(b': ')
+                if info_start == -1:
+                    raise RuntimeError("unexpected output of check-attr: {0}".format(line))
+
+                attr_start = line.rfind(b': ', 0, info_start)
+                if attr_start == -1:
+                    raise RuntimeError("unexpected output of check-attr: {0}".format(line))
+
+                info = line[info_start + 2:len(line) - 1]  # trim leading ": " and trailing \n
+                attr = line[attr_start + 2:info_start]  # trim leading ": "
+                path = line[:attr_start]
+
+                yield map(self.decode_git_output, (path, attr, info))
+                lines_count += 1
+
+        if not attrs:
+            return
+
+        process = make_process()
+
+        try:
+            while True:
+                repo_file_path = yield
+                repo_file_attrs = {}
+
+                if self.git_version is None or self.git_version > (1, 8, 5):
+                    reader = read_attrs
+                else:
+                    reader = read_attrs_old
+
+                for path, attr, value in reader(process, repo_file_path):
+                    repo_file_attrs[attr] = value
+
+                yield repo_file_attrs
+        finally:
+            process.stdin.close()
+            process.wait()
+
     @classmethod
     def decode_git_output(cls, output):
         """
@@ -338,72 +453,31 @@ class GitArchiver(object):
         return output
 
     @classmethod
-    def check_attr(cls, repo_abspath, attrs):
+    def get_git_version(cls):
         """
-        Generator that returns attributes for given paths relative to repo_abspath.
+        Return version of git current shell points to.
 
-        >>> g = GitArchiver.check_attr('repo_path', ['export-ignore'])
-        >>> next(g)
-        >>> attrs = g.send('relative_path')
-        >>> print(attrs['export-ignore'])
+        If version cannot be parsed None is returned.
 
-        @param repo_abspath: Absolute path to a git repository.
-        @type repo_abspath: str
-
-        @param attrs: Attributes to check.
-        @type attrs: [str]
-
-        @rtype: generator
+        @rtype: tuple or None
         """
-        def make_process():
-            env = dict(environ, GIT_FLUSH='1')
-            cmd = 'git check-attr --stdin -z {0}'.format(' '.join(attrs))
-            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
-
-        def read_attrs(process, repo_file_path):
-            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
-            process.stdin.flush()
-
-            # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
-            path, attr, info = b'', b'', b''
-            nuls_count = 0
-            nuls_expected = 3 * len(attrs)
-
-            while nuls_count != nuls_expected:
-                b = process.stdout.read(1)
-
-                if b == b'' and process.poll() is not None:
-                    raise RuntimeError("check-attr exited prematurely")
-                elif b == b'\0':
-                    nuls_count += 1
-
-                    if nuls_count % 3 == 0:
-                        yield map(cls.decode_git_output, (path, attr, info))
-                        path, attr, info = b'', b'', b''
-                elif nuls_count % 3 == 0:
-                    path += b
-                elif nuls_count % 3 == 1:
-                    attr += b
-                elif nuls_count % 3 == 2:
-                    info += b
-
-        if not attrs:
-            return
-
-        process = make_process()
+        try:
+            output = cls.run_git_shell('git version')
+        except CalledProcessError:
+            cls.LOG.warning("Unable to get Git version.")
+            return None
 
         try:
-            while True:
-                repo_file_path = yield
-                repo_file_attrs = {}
+            version = output.split()[-1]
+        except IndexError:
+            cls.LOG.warning("Unable to parse Git version \"%s\".", output)
+            return None
 
-                for path, attr, value in read_attrs(process, repo_file_path):
-                    repo_file_attrs[attr] = value
-
-                yield repo_file_attrs
-        finally:
-            process.stdin.close()
-            process.wait()
+        try:
+            return tuple(int(v) for v in version.split('.'))
+        except ValueError:
+            cls.LOG.warning("Unable to parse Git version \"%s\".", version)
+            return None
 
 
 def main():
