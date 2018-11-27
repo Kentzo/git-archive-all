@@ -1,7 +1,7 @@
 CHANGES
 =======
 
-1.19.3 (2018-xx-yy)
+1.19.3 (2018-11-27)
 -------------------
 
 - Add the git_version parameter to GitArchiver and the get_git_version class method
