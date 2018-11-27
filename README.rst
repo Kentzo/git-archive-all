@@ -1,9 +1,3 @@
-.. image:: https://img.shields.io/pypi/v/git-archive-all.svg
-    :target: https://pypi.python.org/pypi/git-archive-all
-    :alt: PyPI
-.. image:: https://img.shields.io/homebrew/v/git-archive-all.svg
-    :target: https://formulae.brew.sh/formula/git-archive-all
-    :alt: Homebrew
 .. image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
     :target: https://travis-ci.org/Kentzo/git-archive-all
     :alt: Travis
@@ -16,6 +10,23 @@
 .. image:: https://img.shields.io/pypi/implementation/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: Supported Python implementations
+
+|
+
+.. image:: https://img.shields.io/pypi/v/git-archive-all.svg
+    :target: https://pypi.python.org/pypi/git-archive-all
+    :alt: PyPI
+.. image:: https://img.shields.io/homebrew/v/git-archive-all.svg
+    :target: https://formulae.brew.sh/formula/git-archive-all
+    :alt: Homebrew
+
+|
+
+.. image:: https://img.shields.io/gitter/room/git-archive-all/git-archive-all.svg
+    :target: https://gitter.im/git-archive-all/Lobby
+    :alt: Gitter
+
+|
 
 Archive repository with all its submodules.
 
