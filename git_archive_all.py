@@ -468,7 +468,7 @@ class GitArchiver(object):
             return None
 
         try:
-            version = output.split()[-1]
+            version = output.split()[2]
         except IndexError:
             cls.LOG.warning("Unable to parse Git version \"%s\".", output)
             return None
