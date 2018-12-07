@@ -1,12 +1,22 @@
 CHANGES
 =======
 
+1.19.4 (2018-12-07)
+-------------------
+
+- Fixed compatibility with Apple's git (bundled with Xcode)
+
+
 1.19.3 (2018-11-27)
 -------------------
 
 - Add the git_version parameter to GitArchiver and the get_git_version class method
 - If git version (initialized or guessed) is less than 1.6.1, exception is raised
 - Properly read non-nul separated output of check-attr if git version is less than 1.8.5. See #65
+
+**Known Bugs:**
+
+- Does not work with Apple's git (bundled with Xcode). See #68
 
 1.19.2 (2018-11-13)
 -------------------
