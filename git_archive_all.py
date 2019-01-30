@@ -474,7 +474,7 @@ class GitArchiver(object):
             return None
 
         try:
-            return tuple(int(v) for v in version.split('.'))
+            return tuple(int(v) if v.isdigit() else 0 for v in version.split('.'))
         except ValueError:
             cls.LOG.warning("Unable to parse Git version \"%s\".", version)
             return None
