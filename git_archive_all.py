@@ -422,7 +422,7 @@ class GitArchiver(object):
 
         @rtype: str
         """
-        return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+        return '\\'.join(s.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8') for s in output.split(b'\\'))
 
     @classmethod
     def run_git_shell(cls, cmd, cwd=None):
