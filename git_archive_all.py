@@ -484,8 +484,8 @@ def main():
     from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
-        usage="usage: %prog [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules]"
-              " [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
+        usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude]"
+              " [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
 
@@ -496,6 +496,13 @@ def main():
                       help="""prepend PREFIX to each filename in the archive.
                           OUTPUT_FILE name is used by default to avoid tarbomb.
                           You can set it to '' in order to explicitly request tarbomb""")
+
+    parser.add_option('-C',
+                      type='string',
+                      dest='base_repo',
+                      default=None,
+                      help="""use BASE_REPO as the main repository git working directory to archive.
+                           Defaults to current directory when empty""")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
@@ -561,7 +568,9 @@ def main():
         archiver = GitArchiver(options.prefix,
                                options.exclude,
                                options.force_sub,
-                               options.extra)
+                               options.extra,
+                               path.abspath(options.base_repo) if options.base_repo is not None else None
+                               )
         archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
         parser.exit(2, "{0}\n".format(e))
