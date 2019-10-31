@@ -480,7 +480,10 @@ class GitArchiver(object):
             return None
 
 
-def main():
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
     from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
@@ -538,7 +541,7 @@ def main():
                           dest='compresslevel',
                           help=SUPPRESS_HELP)
 
-    options, args = parser.parse_args()
+    options, args = parser.parse_args(argv[1:])
 
     if len(args) != 1:
         parser.error("You must specify exactly one output file")
@@ -575,8 +578,8 @@ def main():
     except Exception as e:
         parser.exit(2, "{0}\n".format(e))
 
-    sys.exit(0)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
