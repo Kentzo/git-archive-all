@@ -52,6 +52,40 @@ except ImportError:
         return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
+try:
+    # Python 3.6+
+    from sys import getfilesystemencodeerrors
+except ImportError:
+    def getfilesystemencodeerrors():
+        encoding = sys.getfilesystemencoding()
+        if encoding == 'mbcs':
+            return 'strict'
+        else:
+            return 'surrogateescape'
+
+
+try:
+    # Python 3.2+
+    from os import fsdecode
+except ImportError:
+    def fsdecode(filename):
+        if isinstance(filename, bytes):
+            return filename.decode(sys.getfilesystemencoding(), getfilesystemencodeerrors())
+        else:
+            return filename
+
+
+try:
+    # Python 3.2+
+    from os import fsencode
+except ImportError:
+    def fsencode(filename):
+        if isinstance(filename, unicode):
+            return filename.encode(sys.getfilesystemencoding(), getfilesystemencodeerrors())
+        else:
+            return filename
+
+
 class GitArchiver(object):
     """
     GitArchiver
@@ -121,7 +155,9 @@ class GitArchiver(object):
             raise ValueError("main_repo_abspath must be an absolute path")
 
         try:
-            main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
+            main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel',
+                                                                cwd=main_repo_abspath,
+                                                                decoder=self.decode_git_path_output).rstrip())
         except CalledProcessError:
             raise ValueError("{0} is not part of a git repository".format(main_repo_abspath))
 
@@ -261,7 +297,8 @@ class GitArchiver(object):
         try:
             repo_file_paths = self.run_git_shell(
                 'git ls-files -z --cached --full-name --no-empty-directory',
-                repo_abspath
+                cwd=repo_abspath,
+                decoder=self.decode_git_path_output
             ).split('\0')[:-1]
 
             for repo_file_path in repo_file_paths:
@@ -332,7 +369,7 @@ class GitArchiver(object):
             return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
         def read_attrs(process, repo_file_path):
-            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.write(fsencode(repo_file_path) + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
@@ -349,7 +386,7 @@ class GitArchiver(object):
                     nuls_count += 1
 
                     if nuls_count % 3 == 0:
-                        yield map(self.decode_git_output, (path, attr, info))
+                        yield self.decode_git_path_output(path), self.decode_git_output(attr), self.decode_git_output(info)
                         path, attr, info = b'', b'', b''
                 elif nuls_count % 3 == 0:
                     path += b
@@ -362,7 +399,7 @@ class GitArchiver(object):
             """
             Compatibility with versions 1.8.5 and below that do not recognize -z for output.
             """
-            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.write(fsencode(repo_file_path) + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path>: <attribute>: <info>\n
@@ -387,7 +424,7 @@ class GitArchiver(object):
                 attr = line[attr_start + 2:info_start]  # trim leading ": "
                 path = line[:attr_start]
 
-                yield map(self.decode_git_output, (path, attr, info))
+                yield self.decode_git_path_output(path), self.decode_git_output(attr), self.decode_git_output(info)
                 lines_count += 1
 
         if not attrs:
@@ -416,8 +453,9 @@ class GitArchiver(object):
     @classmethod
     def decode_git_output(cls, output):
         """
-        Decode Git's binary output handeling the way it escapes unicode characters.
+        Decode Git's output handling the way it escapes unicode characters.
 
+        @param output: Output to decode.
         @type output: bytes
 
         @rtype: str
@@ -425,24 +463,43 @@ class GitArchiver(object):
         return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
 
     @classmethod
-    def run_git_shell(cls, cmd, cwd=None):
+    def decode_git_path_output(cls, output):
         """
-        Runs git shell command, reads output and decodes it into unicode string.
+        Decode Git's output handling the way it escapes unicode characters and how the underlying file system
+        encodes paths.
+
+        @param output: Output to decode.
+        @type output: bytes
+
+        @rtype: str
+        """
+        return fsdecode(output.decode('unicode_escape').encode('raw_unicode_escape'))
+
+    @classmethod
+    def run_git_shell(cls, cmd, cwd=None, decoder=None):
+        """
+        Run git shell command, read output and decode it into a unicode string.
 
         @param cmd: Command to be executed.
         @type cmd: str
 
-        @type cwd: str
         @param cwd: Working directory.
+        @type cwd: str
+
+        @param decoder: Callable to decode raw git output. Defaults to decode_git_output.
+        @type decoder: Callable or None
 
         @rtype: str
         @return: Output of the command.
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
+        if decoder is None:
+            decoder = cls.decode_git_output
+
         p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
         output, _ = p.communicate()
-        output = cls.decode_git_output(output)
+        output = decoder(output)
 
         if p.returncode:
             if sys.version_info > (2, 6):

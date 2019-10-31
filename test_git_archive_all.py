@@ -15,10 +15,13 @@ import pycodestyle
 import pytest
 
 import git_archive_all
-from git_archive_all import GitArchiver
+from git_archive_all import GitArchiver, fsencode, fsdecode
 
 
 def makedirs(p):
+    """
+    Backward compatible os.makedirs with implied exist_ok=True
+    """
     try:
         os.makedirs(p)
     except OSError as e:
@@ -27,15 +30,23 @@ def makedirs(p):
 
 
 def as_posix(p):
-    if sys.version_info < (3,):
-        str_p = unicode(p)
+    """
+    Path with forward slashes preserving byte representation.
+    """
+    if os.sep == '\\':
+        p = p.replace('\\', '/') if isinstance(p, str) else p.replace(b'\\', b'/')
+
+    return p
+
+
+def path_join(*paths):
+    """
+    Join components preserving byte representation.
+    """
+    if any(map(lambda p: isinstance(p, bytes), paths)):
+        return os.path.join(*[fsencode(p) for p in paths])
     else:
-        str_p = str(p)
-
-    if sys.platform.startswith('win32'):
-        str_p = str_p.replace('\\', '/')
-
-    return str_p
+        return os.path.join(*paths)
 
 
 @pytest.fixture
@@ -106,7 +117,7 @@ class Repo:
             raise ValueError
 
     def add_file(self, rel_path, contents):
-        file_path = os.path.join(self.path, rel_path)
+        file_path = path_join(self.path, rel_path)
 
         with open(file_path, 'w') as f:
             f.write(contents)
@@ -115,17 +126,17 @@ class Repo:
         return file_path
 
     def add_dir(self, rel_path, contents):
-        dir_path = os.path.join(self.path, rel_path)
+        dir_path = path_join(self.path, rel_path)
         makedirs(dir_path)
 
         for k, v in contents.items():
-            self.add(as_posix(os.path.normpath(os.path.join(dir_path, k))), v)
+            self.add(as_posix(os.path.normpath(path_join(rel_path, k))), v)
 
         check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
 
     def add_submodule(self, rel_path, contents):
-        submodule_path = os.path.join(self.path, rel_path)
+        submodule_path = path_join(self.path, rel_path)
         r = Repo(submodule_path)
         r.init()
         r.add_dir('.', contents)
@@ -142,29 +153,31 @@ class Repo:
 
 
 def make_expected_tree(contents):
+    """
+    Flatten contents dict for comparison.
+    """
     e = {}
 
     for k, v in contents.items():
         if v.kind == 'file' and not v.excluded:
-            e[k] = v.contents
+            e[fsdecode(k)] = v.contents
         elif v.kind in ('dir', 'submodule') and not v.excluded:
             for nested_k, nested_v in make_expected_tree(v.contents).items():
-                e[as_posix(os.path.join(k, nested_k))] = nested_v
+                nested_k = fsdecode(as_posix(path_join(k, nested_k)))
+                e[nested_k] = nested_v
 
     return e
 
 
 def make_actual_tree(tar_file):
+    """
+    Flatten tar file members for comparison.
+    """
     a = {}
 
     for m in tar_file.getmembers():
         if m.isfile():
-            name = m.name
-
-            if sys.version_info < (3,):
-                name = m.name.decode('utf-8')
-
-            a[name] = tar_file.extractfile(m).read().decode()
+            a[fsdecode(m.name)] = tar_file.extractfile(m).read().decode()
         else:
             raise NotImplementedError
 
@@ -242,6 +255,17 @@ unicode_quoted['data'] = DirRecord({
     '\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
 })
 
+nonunicode_base = deepcopy(base)
+nonunicode_base['data'] = DirRecord({
+    b'test.\xc2': FileRecord('Special cases aren\'t special enough to break the rules.'),
+})
+
+nonunicode_quoted = deepcopy(base)
+nonunicode_quoted['data'] = DirRecord({
+    b'\'test.\xc2\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    b'\"test.\xc2\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
+})
+
 brackets_base = deepcopy(base)
 brackets_base['data'] = DirRecord({
     '[.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
@@ -306,7 +330,9 @@ quote_quoted['data'] = DirRecord({
     pytest.param(brackets_base, id='Brackets'),
     pytest.param(brackets_quoted, id="Brackets (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
     pytest.param(quote_base, id="Quote", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
-    pytest.param(quote_quoted, id="Quote (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename."))
+    pytest.param(quote_quoted, id="Quote (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
+    pytest.param(nonunicode_base, id="No Ignore (Non-Unicode)", marks=pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid APFS filename.')),
+    pytest.param(nonunicode_quoted, id="No Ignore (Quoted Non-Unicode)", marks=pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid APFS filename.'))
 ])
 def test_ignore(contents, tmpdir, git_env, monkeypatch):
     """
@@ -315,15 +341,15 @@ def test_ignore(contents, tmpdir, git_env, monkeypatch):
     for name, value in git_env.items():
         monkeypatch.setenv(name, value)
 
-    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo_path = path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
     repo.init()
     repo.add_dir('.', contents)
     repo.commit('init')
 
-    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo_tar_path = path_join(tmpdir.strpath, 'repo.tar')
     repo.archive(repo_tar_path)
-    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT)
 
     expected = make_expected_tree(contents)
     actual = make_actual_tree(repo_tar)
@@ -337,15 +363,15 @@ def test_cli(tmpdir, git_env, monkeypatch):
     for name, value in git_env.items():
         monkeypatch.setenv(name, value)
 
-    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo_path = path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
     repo.init()
     repo.add_dir('.', contents)
     repo.commit('init')
 
-    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo_tar_path = path_join(tmpdir.strpath, 'repo.tar')
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
-    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT)
 
     expected = make_expected_tree(contents)
     actual = make_actual_tree(repo_tar)
