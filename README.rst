@@ -33,6 +33,7 @@ Archive repository with all its submodules.
 
       --prefix=PREFIX       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb. You can set it to '' in order to explicitly request tarbomb.
 
+      -C BASE_REPO          Use BASE_REPO as the main repository git working directory to archive.  Defaults to current directory when empty
       --no-exclude          Don't read .gitattributes files for patterns containing export-ignore attributes.
 
       --force-submodules    Force a `git submodule init && git submodule update` at each level before iterating submodules
