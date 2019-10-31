@@ -14,6 +14,7 @@ from tarfile import TarFile, PAX_FORMAT
 import pycodestyle
 import pytest
 
+import git_archive_all
 from git_archive_all import GitArchiver
 
 
@@ -138,6 +139,36 @@ class Repo:
     def archive(self, path):
         a = GitArchiver(main_repo_abspath=self.path)
         a.create(path)
+
+
+def make_expected_tree(contents):
+    e = {}
+
+    for k, v in contents.items():
+        if v.kind == 'file' and not v.excluded:
+            e[k] = v.contents
+        elif v.kind in ('dir', 'submodule') and not v.excluded:
+            for nested_k, nested_v in make_expected_tree(v.contents).items():
+                e[as_posix(os.path.join(k, nested_k))] = nested_v
+
+    return e
+
+
+def make_actual_tree(tar_file):
+    a = {}
+
+    for m in tar_file.getmembers():
+        if m.isfile():
+            name = m.name
+
+            if sys.version_info < (3,):
+                name = m.name.decode('utf-8')
+
+            a[name] = tar_file.extractfile(m).read().decode()
+        else:
+            raise NotImplementedError
+
+    return a
 
 
 base = {
@@ -294,36 +325,30 @@ def test_ignore(contents, tmpdir, git_env, monkeypatch):
     repo.archive(repo_tar_path)
     repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
-    def make_expected(contents):
-        e = {}
+    expected = make_expected_tree(contents)
+    actual = make_actual_tree(repo_tar)
 
-        for k, v in contents.items():
-            if v.kind == 'file' and not v.excluded:
-                e[k] = v.contents
-            elif v.kind in ('dir', 'submodule') and not v.excluded:
-                for nested_k, nested_v in make_expected(v.contents).items():
-                    e[as_posix(os.path.join(k, nested_k))] = nested_v
+    assert actual == expected
 
-        return e
 
-    def make_actual(tar_file):
-        a = {}
+def test_cli(tmpdir, git_env, monkeypatch):
+    contents = base
 
-        for m in tar_file.getmembers():
-            if m.isfile():
-                name = m.name
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
-                if sys.version_info < (3,):
-                    name = m.name.decode('utf-8')
+    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
 
-                a[name] = tar_file.extractfile(m).read().decode()
-            else:
-                raise NotImplementedError
+    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
+    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
-        return a
-
-    expected = make_expected(contents)
-    actual = make_actual(repo_tar)
+    expected = make_expected_tree(contents)
+    actual = make_actual_tree(repo_tar)
 
     assert actual == expected
 
