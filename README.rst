@@ -48,6 +48,9 @@ Questions & Answers
 | Q: How to exclude files?
 | A: Mark paths you want to exclude in the .gitattributes file with the export-ignore attribute. Read more on `git-scm.com <https://git-scm.com/docs/gitattributes#_code_export_ignore_code>`_.
 
+| Q: What about non-unicode filenames?
+| A: All filenames that particular version of Python can represent and handle are supported. Extra [en|de]coding is done where appropriate.
+
 Support
 -------
 If functional you need is missing but you're ready to pay for it, feel free to `contact me <mailto:kulakov.ilya@gmail.com?subject=git-archive-all>`_. If not, create an issue anyway, I'll take a look as soon as I can.
