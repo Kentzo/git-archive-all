@@ -1,204 +1,132 @@
+git:
+  depth: 1
+
+before_cache:
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew cleanup; fi
+
+cache:
+  directories:
+    - $HOME/.cache/pyenv
+    - /opt/pyenv/versions/$PYENV_VERSION
+    - $HOME/pyenv/versions/$PYENV_VERSION
+    - $HOME/Library/Caches/Homebrew
+  pip: true
+
 env:
   global:
-  - PIP_URL="https://bootstrap.pypa.io/get-pip.py"
-  - PIP="python -m pip"
+    - PYTHON_BUILD_CACHE_PATH=$HOME/.cache/pyenv
+    - HOMEBREW_NO_INSTALL_CLEANUP=1
 
-matrix:
+jobs:
   fast_finish: true
   include:
-  - os: osx
-    language: generic
-    env:
-    - NAME="Python 2.6"
-    - PIP_URL="https://bootstrap.pypa.io/2.6/get-pip.py"
-    - PIP=pip
-    before_install:
-    - brew update
-    - brew upgrade pyenv || brew install pyenv || true
-    - pyenv install 2.6.9
-    - pyenv local 2.6.9
-    - eval "$(pyenv init -)"
-    - pip install virtualenv
-    - python2.6 -m virtualenv env
-    - pyenv local --unset
-    - source env/bin/activate
-    - python -c "import sys; print(sys.platform)"
-  - os: osx
-    language: generic
-    env: NAME="Python 2 Homebrew"
-    before_install:
-    - brew update
-    - brew upgrade python2 || true
-    - python2.7 -m pip install virtualenv
-    - python2.7 -m virtualenv env
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python pypy Homebrew"
-    before_install:
-    - brew update
-    - brew upgrade pypy || brew install pypy || true
-    - pypy -m pip install virtualenv
-    - pypy -m virtualenv env
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python 3.4"
-    before_install:
-    - brew update
-    - brew upgrade pyenv || brew install pyenv || true
-    - pyenv install 3.4.9
-    - pyenv local 3.4.9
-    - eval "$(pyenv init -)"
-    - python3.4 -m venv env
-    - pyenv local --unset
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python 3.5"
-    before_install:
-    - brew update
-    - brew upgrade pyenv || brew install pyenv || true
-    - pyenv install 3.5.9
-    - pyenv local 3.5.9
-    - eval "$(pyenv init -)"
-    - python3.5 -m venv env
-    - pyenv local --unset
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python 3.6"
-    before_install:
-    - brew update
-    - brew upgrade pyenv || brew install pyenv || true
-    - pyenv install 3.6.9
-    - pyenv local 3.6.9
-    - eval "$(pyenv init -)"
-    - python3.6 -m venv env
-    - pyenv local --unset
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python 3.7"
-    before_install:
-    - brew update
-    - brew upgrade pyenv || brew install pyenv || true
-    - pyenv install 3.7.5
-    - pyenv local 3.7.5
-    - eval "$(pyenv init -)"
-    - python3.6 -m venv env
-    - pyenv local --unset
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python 3 Homebrew"
-    before_install:
-    - brew update
-    - brew upgrade python || true
-    - python3.7 -m venv env
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python pypy3 Homebrew"
-    before_install:
-    - brew update
-    - brew upgrade pypy3 || brew install pypy3 || true
-    - pypy3 -m venv env
-    - source env/bin/activate
-  - os: osx
-    language: generic
-    env: NAME="Python HEAD"
-    before_install:
-    - brew update
-    - brew unlink python
-    - brew install python --HEAD
-    - python3 -m venv env
-    - source env/bin/activate
-  - os: linux
-    env:
-    - PIP_URL="https://bootstrap.pypa.io/2.6/get-pip.py"
-    - PIP=pip
-    language: python
-    python: 2.6
-    dist: trusty
-  - os: linux
-    language: python
-    python: 2.7
-  - os: linux
-    language: python
-    python: pypy
-  - os: linux
-    language: python
-    python: 3.4
-  - os: linux
-    language: python
-    python: 3.5
-  - os: linux
-    language: python
-    python: 3.6
-  - os: linux
-    language: python
-    python: 3.7
-    sudo: true
-  - os: linux
-    language: python
-    python: 3.8
-    sudo: true
-  - os: linux
-    language: python
-    python: 3.6-dev
-  - os: linux
-    language: python
-    python: 3.7-dev
-  - os: linux
-    language: python
-    python: 3.8-dev
-  - os: linux
-    language: python
-    python: nightly
-  - os: linux
-    language: python
-    python: pypy3
+    - &linux
+      os: linux
+      language: python
+      env: PYENV_VERSION=2.6.9 TOXENV=py26
+    - <<: *linux
+      env: PYENV_VERSION=2.7.17 TOXENV=py27
+    - <<: *linux
+      env: PYENV_VERSION=2.7-dev TOXENV=py27
+    - <<: *linux
+      env: PYENV_VERSION=3.4.10 TOXENV=py34
+    - <<: *linux
+      env: PYENV_VERSION=3.5.8 TOXENV=py35
+    - <<: *linux
+      env: PYENV_VERSION=3.5-dev TOXENV=py35
+    - <<: *linux
+      env: PYENV_VERSION=3.6.9 TOXENV=py36
+    - <<: *linux
+      env: PYENV_VERSION=3.6-dev TOXENV=py36
+    - <<: *linux
+      env: PYENV_VERSION=3.7.5 TOXENV=py37
+    - <<: *linux
+      env: PYENV_VERSION=3.7-dev TOXENV=py37
+    - <<: *linux
+      env: PYENV_VERSION=3.8.0 TOXENV=py38
+    - <<: *linux
+      env: PYENV_VERSION=3.8-dev TOXENV=py38
+    - <<: *linux
+      env: PYENV_VERSION=3.9-dev TOXENV=py39
+    - <<: *linux
+      env: PYENV_VERSION=pypy2.7-7.2.0 TOXENV=pypy
+    - <<: *linux
+      env: PYENV_VERSION=pypy3.6-7.2.0 TOXENV=pypy3
+    - &osx
+      os: osx
+      language: generic
+      env: PYENV_VERSION=2.6.9 TOXENV=py26
+    - <<: *osx
+      env: PYENV_VERSION=2.7.17 TOXENV=py27
+    - <<: *osx
+      env: PYENV_VERSION=2.7-dev TOXENV=py27
+    - <<: *osx
+      env: PYENV_VERSION=3.4.10 TOXENV=py34
+    - <<: *osx
+      env: PYENV_VERSION=3.5.8 TOXENV=py35
+    - <<: *osx
+      env: PYENV_VERSION=3.5-dev TOXENV=py35
+    - <<: *osx
+      env: PYENV_VERSION=3.6.9 TOXENV=py36
+    - <<: *osx
+      env: PYENV_VERSION=3.6-dev TOXENV=py36
+    - <<: *osx
+      env: PYENV_VERSION=3.7.5 TOXENV=py37
+    - <<: *osx
+      env: PYENV_VERSION=3.7-dev TOXENV=py37
+    - <<: *osx
+      env: PYENV_VERSION=3.8.0 TOXENV=py38
+    - <<: *osx
+      env: PYENV_VERSION=3.8-dev TOXENV=py38
+    - <<: *osx
+      env: PYENV_VERSION=3.9-dev TOXENV=py39
+    - <<: *osx
+      env: PYENV_VERSION=pypy2.7-7.2.0 TOXENV=pypy
+    - <<: *osx
+      env: PYENV_VERSION=pypy3.6-7.2.0 TOXENV=pypy3
   allow_failures:
-  - os: osx
-    env: NAME="Python HEAD"
-  - os: linux
-    python: 3.6-dev
-  - os: linux
-    python: 3.7-dev
-  - os: linux
-    python: 3.8-dev
-  - os: linux
-    python: nightly
+    - env: PYENV_VERSION=2.7-dev TOXENV=py27
+    - env: PYENV_VERSION=3.5-dev TOXENV=py35
+    - env: PYENV_VERSION=3.6-dev TOXENV=py36
+    - env: PYENV_VERSION=3.7-dev TOXENV=py37
+    - env: PYENV_VERSION=3.8-dev TOXENV=py38
+    - env: PYENV_VERSION=3.9-dev TOXENV=py39
+
+before_install:
+  - mkdir -p ${HOME}/.cache/pyenv
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && (brew upgrade pyenv || true); fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then git -C "$(pyenv root)" fetch && git -C "$(pyenv root)" checkout master && git -C "$(pyenv root)" pull; fi
 
 install:
-- curl ${PIP_URL} | python
-- ${PIP} install -r requirements.txt
+  - python -m pip install tox==3.14.0 codecov==2.0.15 tox-pyenv==1.1.0 virtualenv==15.2.0
+  - pyenv install $(pyenv exec python --version >/dev/null 2>&1 && echo "--skip-existing" || echo "--force")  "${PYENV_VERSION}"
 
 script:
-- make test
+  - python -m tox -vv -- --cov-report=xml
 
 after_success:
-- python -m codecov
-- python setup.py sdist bdist_wheel
+  - python -m codecov --required
+
+before_deploy:
+  - python setup.py sdist bdist_wheel
 
 deploy:
-- provider: pypi
-  user: Ilya.Kulakov
-  password:
-    secure: "fDYi/HJvYyqUggKmN/Dc6YewUsBAzHWBdTYMpDfHETeOIvv2G268atnIwcoWav63fwPUpagwOlzQhRklqeLRmjEzr4M+wzFsAQVAnj6a7ChLPWPmgZlClFRpm6leWZjzGD+1FPnH/vvwTHlDi7j+1zgfh4WEellnw3hU+Lzjx+o="
-  distributions: "sdist bdist_wheel"
-  on:
-    tags: true
-    branch: master
-    python: 3.6
-- provider: releases
-  skip_cleanup: true
-  api_key:
-    secure: "QHn7vzWo7rbgemP37qdNU4h+q7Xb2CQ7HxPFfa7yTsxFd8V4+sQLVrnaQtzYTM8dJWvRgi8PVHVGl2VGnQAiRM4Nd/NE/3HL9aHQIfWRtZ6XHfNVQ55bxJzLfZZy2M+32b8W268ELj3ty4C3Mo7TuOTv4svQoRDrLzGozJCpu+w="
-  file_glob: true
-  file: dist/*
-  on:
-    tags: true
-    branch: master
-    python: 3.6
+  - provider: pypi
+    user: Ilya.Kulakov
+    password:
+      secure: "fDYi/HJvYyqUggKmN/Dc6YewUsBAzHWBdTYMpDfHETeOIvv2G268atnIwcoWav63fwPUpagwOlzQhRklqeLRmjEzr4M+wzFsAQVAnj6a7ChLPWPmgZlClFRpm6leWZjzGD+1FPnH/vvwTHlDi7j+1zgfh4WEellnw3hU+Lzjx+o="
+    distributions: "sdist bdist_wheel"
+    on:
+      tags: true
+      branch: master
+      python: 3.6
+  - provider: releases
+    skip_cleanup: true
+    api_key:
+      secure: "QHn7vzWo7rbgemP37qdNU4h+q7Xb2CQ7HxPFfa7yTsxFd8V4+sQLVrnaQtzYTM8dJWvRgi8PVHVGl2VGnQAiRM4Nd/NE/3HL9aHQIfWRtZ6XHfNVQ55bxJzLfZZy2M+32b8W268ELj3ty4C3Mo7TuOTv4svQoRDrLzGozJCpu+w="
+    file_glob: true
+    file: dist/*
+    on:
+      tags: true
+      branch: master
+      python: 3.6

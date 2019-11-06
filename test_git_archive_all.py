@@ -396,7 +396,6 @@ def test_cli(tmpdir, git_env, monkeypatch):
     assert actual == expected
 
 
-@pytest.mark.skipif(sys.version_info < (2, 7), reason="No mocking on Python 2.6")
 @pytest.mark.parametrize('version', [
     b'git version 2.21.0.0.1',
     b'git version 2.21.0.windows.1'
