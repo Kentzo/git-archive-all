@@ -35,7 +35,7 @@ jobs:
     - <<: *linux
       env: PYENV_VERSION=3.5-dev TOXENV=py35
     - <<: *linux
-      env: PYENV_VERSION=3.6.9 TOXENV=py36
+      env: PYENV_VERSION=3.6.9 TOXENV=py36 DEPLOY=1
     - <<: *linux
       env: PYENV_VERSION=3.6-dev TOXENV=py36
     - <<: *linux
@@ -119,7 +119,7 @@ deploy:
     on:
       tags: true
       branch: master
-      python: 3.6
+      condition: $DEPLOY = 1
   - provider: releases
     skip_cleanup: true
     api_key:
@@ -129,4 +129,4 @@ deploy:
     on:
       tags: true
       branch: master
-      python: 3.6
+      condition: $DEPLOY = 1
