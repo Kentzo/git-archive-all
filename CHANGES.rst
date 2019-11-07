@@ -1,11 +1,17 @@
 CHANGES
 =======
 
+1.20.0 (2019-11-07)
+-------------------
+
+- Fixed handling of non-unicode byte sequences on Linux
+- Fixed parsing of git version on Windows
+- Added support for path-like objects to GitArchiver
+
 1.19.4 (2018-12-07)
 -------------------
 
 - Fixed compatibility with Apple's git (bundled with Xcode)
-
 
 1.19.3 (2018-11-27)
 -------------------

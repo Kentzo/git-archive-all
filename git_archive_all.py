@@ -32,7 +32,7 @@ from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
 
-__version__ = "1.20.0-dev0"
+__version__ = "1.20.0"
 
 
 try:
