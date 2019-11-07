@@ -1,26 +1,30 @@
+clone_depth: 1
+
+image:
+  - Visual Studio 2019
+
 environment:
+  PYTHON: "C:\\Python37-x64"
+
   matrix:
-#    Python 2.6 builds do not work because bundled OpenSSL does not support TLS.
-#    - PYTHON: "C:\\Python26"
-#    - PYTHON: "C:\\Python26-x64"
-#    Python 2.x builds do not work, because readlink for Windows is not available before Python 3.3
-#    - PYTHON: "C:\\Python27"
-#    - PYTHON: "C:\\Python27-x64"
-    - PYTHON: "C:\\Python34"
-    - PYTHON: "C:\\Python34-x64"
-    - PYTHON: "C:\\Python35"
-    - PYTHON: "C:\\Python35-x64"
-    - PYTHON: "C:\\Python36"
-    - PYTHON: "C:\\Python36-x64"
-    - PYTHON: "C:\\Python37"
-    - PYTHON: "C:\\Python37-x64"
+#    Python 2.x builds do not work because implementation of os.readlink did not support Windows till 3.2
+    - TOXENV: "py34"
+    - TOXENV: "py35"
+    - TOXENV: "py36"
+    - TOXENV: "py37"
+
+matrix:
+  fast_finish: true
 
 build: off
 
 install:
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
   - "%PYTHON%\\python.exe -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0"
+  - "%PYTHON%\\python.exe -m pip install --upgrade tox==3.14.0 codecov==2.0.15 tox-venv==0.4.0"
 
 test_script:
-  - "%PYTHON%\\python.exe -m pip install -r requirements.txt"
-  - "%PYTHON%\\python.exe setup.py test"
+  - "%PYTHON%\\python.exe -m tox -vv -- --cov-report=xml"
+
+after_test:
+  - "%PYTHON%\\python.exe -m codecov --required --file %APPVEYOR_BUILD_FOLDER%\\coverage.xml"

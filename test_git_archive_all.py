@@ -15,7 +15,7 @@ import pycodestyle
 import pytest
 
 import git_archive_all
-from git_archive_all import GitArchiver
+from git_archive_all import GitArchiver, fspath
 
 
 def makedirs(p):
@@ -27,15 +27,17 @@ def makedirs(p):
 
 
 def as_posix(p):
-    if sys.version_info < (3,):
-        str_p = unicode(p)
-    else:
-        str_p = str(p)
-
     if sys.platform.startswith('win32'):
-        str_p = str_p.replace('\\', '/')
+        return p.replace(b'\\', b'/') if isinstance(p, bytes) else p.replace('\\', '/')
+    else:
+        return p
 
-    return str_p
+
+def os_path_join(*args):
+    """
+    Ensure that all path components are uniformly encoded.
+    """
+    return os.path.join(*(fspath(p) for p in args))
 
 
 @pytest.fixture
@@ -49,13 +51,13 @@ def git_env(tmpdir_factory):
     """
     e = {
         'GIT_CONFIG_NOSYSTEM': 'true',
-        'HOME': str(tmpdir_factory.getbasetemp())
+        'HOME': tmpdir_factory.getbasetemp().strpath
     }
 
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('w+') as f:
         f.writelines([
             '[core]\n',
-            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes'))),
+            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes').strpath)),
             '[user]\n',
             'name = git-archive-all\n',
             'email = git-archive-all@example.com\n',
@@ -89,7 +91,7 @@ SubmoduleRecord = partial(Record, 'submodule', excluded=False)
 
 class Repo:
     def __init__(self, path):
-        self.path = os.path.abspath(path)
+        self.path = os.path.abspath(fspath(path))
 
     def init(self):
         os.mkdir(self.path)
@@ -106,7 +108,7 @@ class Repo:
             raise ValueError
 
     def add_file(self, rel_path, contents):
-        file_path = os.path.join(self.path, rel_path)
+        file_path = os_path_join(self.path, rel_path)
 
         with open(file_path, 'w') as f:
             f.write(contents)
@@ -115,17 +117,17 @@ class Repo:
         return file_path
 
     def add_dir(self, rel_path, contents):
-        dir_path = os.path.join(self.path, rel_path)
+        dir_path = os_path_join(self.path, rel_path)
         makedirs(dir_path)
 
         for k, v in contents.items():
-            self.add(as_posix(os.path.normpath(os.path.join(dir_path, k))), v)
+            self.add(as_posix(os.path.normpath(os_path_join(dir_path, k))), v)
 
         check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
 
     def add_submodule(self, rel_path, contents):
-        submodule_path = os.path.join(self.path, rel_path)
+        submodule_path = os_path_join(self.path, rel_path)
         r = Repo(submodule_path)
         r.init()
         r.add_dir('.', contents)
@@ -149,7 +151,8 @@ def make_expected_tree(contents):
             e[k] = v.contents
         elif v.kind in ('dir', 'submodule') and not v.excluded:
             for nested_k, nested_v in make_expected_tree(v.contents).items():
-                e[as_posix(os.path.join(k, nested_k))] = nested_v
+                nested_k = as_posix(os_path_join(k, nested_k))
+                e[nested_k] = nested_v
 
     return e
 
@@ -159,11 +162,7 @@ def make_actual_tree(tar_file):
 
     for m in tar_file.getmembers():
         if m.isfile():
-            name = m.name
-
-            if sys.version_info < (3,):
-                name = m.name.decode('utf-8')
-
+            name = fspath(m.name)
             a[name] = tar_file.extractfile(m).read().decode()
         else:
             raise NotImplementedError
@@ -291,9 +290,47 @@ quote_quoted['data'] = DirRecord({
     '\'\".dat\'': FileRecord('Although practicality beats purity.'),
 })
 
+nonunicode_base = deepcopy(base)
+nonunicode_base['data'] = DirRecord({
+    b'test.\xc2': FileRecord('Special cases aren\'t special enough to break the rules.'),
+})
+
+nonunicode_quoted = deepcopy(base)
+nonunicode_quoted['data'] = DirRecord({
+    b'\'test.\xc2\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    b'\"test.\xc2\"': FileRecord('Although practicality beats purity.'),
+})
+
+backslash_base = deepcopy(base)
+backslash_base['data'] = DirRecord({
+    '\\.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+})
+
+backslash_quoted = deepcopy(base)
+backslash_quoted['data'] = DirRecord({
+    '\'\\.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\"\\.dat\"': FileRecord('Although practicality beats purity.')
+})
+
+non_unicode_backslash_base = deepcopy(base)
+non_unicode_backslash_base['data'] = DirRecord({
+    b'\\\xc2.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+})
+
+non_unicode_backslash_quoted = deepcopy(base)
+non_unicode_backslash_quoted['data'] = DirRecord({
+    b'\'\\\xc2.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    b'\"\\\xc2.dat\"': FileRecord('Although practicality beats purity.')
+})
+
+
+skipif_file_darwin = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid macOS filename.')
+skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")
+
+
 @pytest.mark.parametrize('contents', [
     pytest.param(base, id='No Ignore'),
-    pytest.param(base_quoted, id='No Ignore (Quoted)', marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
+    pytest.param(base_quoted, id='No Ignore (Quoted)', marks=skipif_file_win32),
     pytest.param(ignore_in_root, id='Ignore in Root'),
     pytest.param(ignore_in_submodule, id='Ignore in Submodule'),
     pytest.param(ignore_in_nested_submodule, id='Ignore in Nested Submodule'),
@@ -301,12 +338,18 @@ quote_quoted['data'] = DirRecord({
     pytest.param(ignore_in_nested_submodule_from_root, id='Ignore in Nested Submodule from Root'),
     pytest.param(ignore_in_nested_submodule_from_submodule, id='Ignore in Nested Submodule from Submodule'),
     pytest.param(unset_export_ignore, id='-export-ignore'),
-    pytest.param(unicode_base, id='No Ignore (Unicode)'),
-    pytest.param(unicode_quoted, id='No Ignore (Quoted Unicode)', marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
+    pytest.param(unicode_base, id='Unicode'),
+    pytest.param(unicode_quoted, id='Unicode (Quoted)', marks=skipif_file_win32),
     pytest.param(brackets_base, id='Brackets'),
-    pytest.param(brackets_quoted, id="Brackets (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
-    pytest.param(quote_base, id="Quote", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")),
-    pytest.param(quote_quoted, id="Quote (Quoted)", marks=pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename."))
+    pytest.param(brackets_quoted, id="Brackets (Quoted)", marks=skipif_file_win32),
+    pytest.param(quote_base, id="Quote", marks=skipif_file_win32),
+    pytest.param(quote_quoted, id="Quote (Quoted)", marks=skipif_file_win32),
+    pytest.param(nonunicode_base, id="Non-Unicode", marks=[skipif_file_win32, skipif_file_darwin]),
+    pytest.param(nonunicode_quoted, id="Non-Unicode (Quoted)", marks=[skipif_file_win32, skipif_file_darwin]),
+    pytest.param(backslash_base, id='Backslash', marks=skipif_file_win32),
+    pytest.param(backslash_quoted, id='Backslash (Quoted)', marks=skipif_file_win32),
+    pytest.param(non_unicode_backslash_base, id='Non-Unicode Backslash', marks=[skipif_file_win32, skipif_file_darwin]),
+    pytest.param(non_unicode_backslash_quoted, id='Non-Unicode Backslash (Quoted)', marks=[skipif_file_win32, skipif_file_darwin])
 ])
 def test_ignore(contents, tmpdir, git_env, monkeypatch):
     """
@@ -315,13 +358,13 @@ def test_ignore(contents, tmpdir, git_env, monkeypatch):
     for name, value in git_env.items():
         monkeypatch.setenv(name, value)
 
-    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
     repo.init()
     repo.add_dir('.', contents)
     repo.commit('init')
 
-    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.archive(repo_tar_path)
     repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
@@ -337,13 +380,13 @@ def test_cli(tmpdir, git_env, monkeypatch):
     for name, value in git_env.items():
         monkeypatch.setenv(name, value)
 
-    repo_path = os.path.join(str(tmpdir), 'repo')
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
     repo.init()
     repo.add_dir('.', contents)
     repo.commit('init')
 
-    repo_tar_path = os.path.join(str(tmpdir), 'repo.tar')
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
     repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
@@ -351,6 +394,15 @@ def test_cli(tmpdir, git_env, monkeypatch):
     actual = make_actual_tree(repo_tar)
 
     assert actual == expected
+
+
+@pytest.mark.parametrize('version', [
+    b'git version 2.21.0.0.1',
+    b'git version 2.21.0.windows.1'
+])
+def test_git_version_parse(version, mocker):
+    mocker.patch.object(GitArchiver, 'run_git_shell', return_value=version)
+    assert GitArchiver.get_git_version() == (2, 21, 0, 0, 1)
 
 
 def test_pycodestyle():

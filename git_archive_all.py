@@ -32,24 +32,88 @@ from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
 
-__version__ = "1.19.4"
+__version__ = "1.20.0"
 
 
 try:
-    # Python 3.3+
-    from shlex import quote
+    # Python 3.2+
+    from os import fsdecode
 except ImportError:
-    _find_unsafe = re.compile(r'[^a-zA-Z0-9_@%+=:,./-]').search
+    def fsdecode(filename):
+        if not isinstance(filename, unicode):
+            return filename.decode(sys.getfilesystemencoding(), 'strict')
+        else:
+            return filename
 
-    def quote(s):
-        """Return a shell-escaped version of the string *s*."""
-        if not s:
-            return "''"
+try:
+    # Python 3.2+
+    from os import fsencode
+except ImportError:
+    def fsencode(filename):
+        if not isinstance(filename, bytes):
+            return filename.encode(sys.getfilesystemencoding(), 'strict')
+        else:
+            return filename
 
-        if _find_unsafe(s) is None:
-            return s
 
-        return "'" + s.replace("'", "'\"'\"'") + "'"
+def git_fsdecode(filename):
+    """
+    Decode filename from git output into str.
+    """
+    if sys.platform.startswith('win32'):
+        return filename.decode('utf-8')
+    else:
+        return fsdecode(filename)
+
+
+def git_fsencode(filename):
+    """
+    Encode filename from str into git input.
+    """
+    if sys.platform.startswith('win32'):
+        return filename.encode('utf-8')
+    else:
+        return fsencode(filename)
+
+
+try:
+    # Python 3.6+
+    from os import fspath as _fspath
+
+    def fspath(filename, decoder=fsdecode, encoder=fsencode):
+        """
+        Convert filename into bytes or str, depending on what's the best type
+        to represent paths for current Python and platform.
+        """
+        # Python 3.6+: str can represent any path (PEP 383)
+        #   str is not required on Windows (PEP 529)
+        # Decoding is still applied for consistency and to follow PEP 519 recommendation.
+        return decoder(_fspath(filename))
+except ImportError:
+    def fspath(filename, decoder=fsdecode, encoder=fsencode):
+        # Python 3.4 and 3.5: str can represent any path (PEP 383),
+        #   but str is required on Windows (no PEP 529)
+        #
+        # Python 2.6 and 2.7: str cannot represent any path (no PEP 383),
+        #   str is required on Windows (no PEP 529)
+        #   bytes is required on POSIX (no PEP 383)
+        if sys.version_info > (3,):
+            import pathlib
+            if isinstance(filename, pathlib.PurePath):
+                return str(filename)
+            else:
+                return decoder(filename)
+        elif sys.platform.startswith('win32'):
+            return decoder(filename)
+        else:
+            return encoder(filename)
+
+
+def git_fspath(filename):
+    """
+    fspath representation of git output.
+    """
+    return fspath(filename, git_fsdecode, git_fsencode)
 
 
 class GitArchiver(object):
@@ -85,54 +149,43 @@ class GitArchiver(object):
               baz
               foo/
                 bar
-        @type prefix: str
 
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
-        @type exclude: bool
 
         @param force_sub: Determines whether submodules are initialized and updated before archiving.
-        @type force_sub: bool
 
         @param extra: List of extra paths to include in the resulting archive.
-        @type extra: list
 
         @param main_repo_abspath: Absolute path to the main repository (or one of subdirectories).
             If given path is path to a subdirectory (but not a submodule directory!) it will be replaced
             with abspath to top-level directory of the repository.
             If None, current cwd is used.
-        @type main_repo_abspath: str
 
         @param git_version: Version of Git that determines whether various workarounds are on.
             If None, tries to resolve via Git's CLI.
-        @type git_version: tuple or None
         """
+        self._should_decode_path = None
+        self._check_attr_gens = {}
+
         if git_version is None:
             git_version = self.get_git_version()
 
         if git_version is not None and git_version < (1, 6, 1):
             raise ValueError("git of version 1.6.1 and higher is required")
 
-        if extra is None:
-            extra = []
+        self.git_version = git_version
 
         if main_repo_abspath is None:
             main_repo_abspath = path.abspath('')
         elif not path.isabs(main_repo_abspath):
             raise ValueError("main_repo_abspath must be an absolute path")
 
-        try:
-            main_repo_abspath = path.abspath(self.run_git_shell('git rev-parse --show-toplevel', main_repo_abspath).rstrip())
-        except CalledProcessError:
-            raise ValueError("{0} is not part of a git repository".format(main_repo_abspath))
+        self.main_repo_abspath = self.resolve_git_main_repo_abspath(main_repo_abspath)
 
-        self.prefix = prefix
+        self.prefix = fspath(prefix)
         self.exclude = exclude
-        self.extra = extra
+        self.extra = [fspath(e) for e in extra] if extra is not None else []
         self.force_sub = force_sub
-        self.main_repo_abspath = main_repo_abspath
-        self.git_version = git_version
-
-        self._check_attr_gens = {}
 
     def create(self, output_path, dry_run=False, output_format=None, compresslevel=None):
         """
@@ -142,15 +195,16 @@ class GitArchiver(object):
         Supported formats are: gz, zip, bz2, xz, tar, tgz, txz
 
         @param output_path: Output file path.
-        @type output_path: str
 
         @param dry_run: Determines whether create should do nothing but print what it would archive.
-        @type dry_run: bool
 
         @param output_format: Determines format of the output archive. If None, format is determined from extension
             of output_file_path.
-        @type output_format: str
+
+        @param compresslevel: Optional compression level. Interpretation depends on the output format.
         """
+        output_path = fspath(output_path)
+
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
@@ -195,13 +249,13 @@ class GitArchiver(object):
                 raise ValueError("unknown format: {0}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug("{0} => {1}".format(file_path, arcname))
+                self.LOG.debug(fspath("{0} => {1}").format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info("{0} => {1}".format(file_path, arcname))
+                self.LOG.info(fspath("{0} => {1}").format(file_path, arcname))
 
         self.archive_all_files(archiver)
 
@@ -213,17 +267,14 @@ class GitArchiver(object):
         Checks whether file at a given path is excluded.
 
         @param repo_abspath: Absolute path to the git repository.
-        @type repo_abspath: str
 
         @param repo_file_path: Path to a file relative to repo_abspath.
-        @type repo_file_path: str
 
         @return: True if file should be excluded. Otherwise False.
-        @rtype: bool
         """
         next(self._check_attr_gens[repo_abspath])
         attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
-        return attrs['export-ignore'] == 'set'
+        return attrs['export-ignore'] == b'set'
 
     def archive_all_files(self, archiver):
         """
@@ -231,7 +282,6 @@ class GitArchiver(object):
 
         @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
-        @type archiver: Callable
         """
         for file_path in self.extra:
             archiver(path.abspath(file_path), path.join(self.prefix, file_path))
@@ -239,7 +289,7 @@ class GitArchiver(object):
         for file_path in self.walk_git_files():
             archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
 
-    def walk_git_files(self, repo_path=''):
+    def walk_git_files(self, repo_path=fspath('')):
         """
         An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive.
@@ -249,20 +299,24 @@ class GitArchiver(object):
         Recurs into submodules as well.
 
         @param repo_path: Path to the git submodule repository relative to main_repo_abspath.
-        @type repo_path: str
 
         @return: Iterator to traverse files under git control relative to main_repo_abspath.
-        @rtype: Iterable
         """
-        repo_abspath = path.join(self.main_repo_abspath, repo_path)
+        repo_abspath = path.join(self.main_repo_abspath, fspath(repo_path))
         assert repo_abspath not in self._check_attr_gens
-        self._check_attr_gens[repo_abspath] = self.check_attr(repo_abspath, ['export-ignore'])
+        self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'])
 
         try:
             repo_file_paths = self.run_git_shell(
                 'git ls-files -z --cached --full-name --no-empty-directory',
-                repo_abspath
-            ).split('\0')[:-1]
+                cwd=repo_abspath
+            )
+            repo_file_paths = repo_file_paths.split(b'\0')[:-1]
+
+            if sys.platform.startswith('win32'):
+                repo_file_paths = (git_fspath(p.replace(b'/', b'\\')) for p in repo_file_paths)
+            else:
+                repo_file_paths = map(git_fspath, repo_file_paths)
 
             for repo_file_path in repo_file_paths:
                 repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
@@ -282,7 +336,7 @@ class GitArchiver(object):
                 self.run_git_shell('git submodule update', repo_abspath)
 
             try:
-                repo_gitmodules_abspath = path.join(repo_abspath, ".gitmodules")
+                repo_gitmodules_abspath = path.join(repo_abspath, fspath(".gitmodules"))
 
                 with open(repo_gitmodules_abspath) as f:
                     lines = f.readlines()
@@ -291,7 +345,7 @@ class GitArchiver(object):
                     m = re.match("^\\s*path\\s*=\\s*(.*)\\s*$", l)
 
                     if m:
-                        repo_submodule_path = m.group(1)  # relative to repo_path
+                        repo_submodule_path = fspath(m.group(1))  # relative to repo_path
                         main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
                         if self.is_file_excluded(repo_abspath, repo_submodule_path):
@@ -309,22 +363,19 @@ class GitArchiver(object):
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
 
-    def check_attr(self, repo_abspath, attrs):
+    def check_git_attr(self, repo_abspath, attrs):
         """
-        Generator that returns attributes for given paths relative to repo_abspath.
+        Generator that returns git attributes for received paths relative to repo_abspath.
 
-        >>> g = GitArchiver.check_attr('repo_path', ['export-ignore'])
+        >>> archiver = GitArchiver(...)
+        >>> g = archiver.check_git_attr('repo_path', ['export-ignore'])
         >>> next(g)
         >>> attrs = g.send('relative_path')
         >>> print(attrs['export-ignore'])
 
         @param repo_abspath: Absolute path to a git repository.
-        @type repo_abspath: str
 
-        @param attrs: Attributes to check.
-        @type attrs: [str]
-
-        @rtype: generator
+        @param attrs: Attributes to check
         """
         def make_process():
             env = dict(environ, GIT_FLUSH='1')
@@ -332,7 +383,7 @@ class GitArchiver(object):
             return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
         def read_attrs(process, repo_file_path):
-            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.write(repo_file_path + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
@@ -349,7 +400,8 @@ class GitArchiver(object):
                     nuls_count += 1
 
                     if nuls_count % 3 == 0:
-                        yield map(self.decode_git_output, (path, attr, info))
+                        yield path, attr, info
+
                         path, attr, info = b'', b'', b''
                 elif nuls_count % 3 == 0:
                     path += b
@@ -362,7 +414,7 @@ class GitArchiver(object):
             """
             Compatibility with versions 1.8.5 and below that do not recognize -z for output.
             """
-            process.stdin.write(repo_file_path.encode('utf-8') + b'\0')
+            process.stdin.write(repo_file_path + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path>: <attribute>: <info>\n
@@ -383,11 +435,11 @@ class GitArchiver(object):
                 if attr_start == -1:
                     raise RuntimeError("unexpected output of check-attr: {0}".format(line))
 
-                info = line[info_start + 2:len(line) - 1]  # trim leading ": " and trailing \n
-                attr = line[attr_start + 2:info_start]  # trim leading ": "
                 path = line[:attr_start]
+                attr = line[attr_start + 2:info_start]  # trim leading ": "
+                info = line[info_start + 2:len(line) - 1]  # trim leading ": " and trailing \n
+                yield path, attr, info
 
-                yield map(self.decode_git_output, (path, attr, info))
                 lines_count += 1
 
         if not attrs:
@@ -395,17 +447,19 @@ class GitArchiver(object):
 
         process = make_process()
 
+        if self.git_version is None or self.git_version > (1, 8, 5):
+            reader = read_attrs
+        else:
+            reader = read_attrs_old
+
         try:
             while True:
                 repo_file_path = yield
+                repo_file_path = git_fsencode(fspath(repo_file_path))
                 repo_file_attrs = {}
 
-                if self.git_version is None or self.git_version > (1, 8, 5):
-                    reader = read_attrs
-                else:
-                    reader = read_attrs_old
-
                 for path, attr, value in reader(process, repo_file_path):
+                    attr = attr.decode('utf-8')
                     repo_file_attrs[attr] = value
 
                 yield repo_file_attrs
@@ -413,36 +467,31 @@ class GitArchiver(object):
             process.stdin.close()
             process.wait()
 
-    @classmethod
-    def decode_git_output(cls, output):
+    def resolve_git_main_repo_abspath(self, abspath):
         """
-        Decode Git's binary output handeling the way it escapes unicode characters.
-
-        @type output: bytes
-
-        @rtype: str
+        Return absolute path to the repo for a given path.
         """
-        return output.decode('unicode_escape').encode('raw_unicode_escape').decode('utf-8')
+        try:
+            main_repo_abspath = self.run_git_shell('git rev-parse --show-toplevel', cwd=abspath).rstrip()
+            return path.abspath(git_fspath(main_repo_abspath))
+        except CalledProcessError as e:
+            raise ValueError("{0} is not part of a git repository ({1})".format(abspath, e.returncode))
 
     @classmethod
     def run_git_shell(cls, cmd, cwd=None):
         """
-        Runs git shell command, reads output and decodes it into unicode string.
+        Run git shell command, read output and decode it into a unicode string.
 
         @param cmd: Command to be executed.
-        @type cmd: str
 
-        @type cwd: str
         @param cwd: Working directory.
 
-        @rtype: str
         @return: Output of the command.
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
         p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
         output, _ = p.communicate()
-        output = cls.decode_git_output(output)
 
         if p.returncode:
             if sys.version_info > (2, 6):
@@ -458,8 +507,6 @@ class GitArchiver(object):
         Return version of git current shell points to.
 
         If version cannot be parsed None is returned.
-
-        @rtype: tuple or None
         """
         try:
             output = cls.run_git_shell('git version')
@@ -474,7 +521,7 @@ class GitArchiver(object):
             return None
 
         try:
-            return tuple(int(v) for v in version.split('.'))
+            return tuple(int(v) if v.isdigit() else 0 for v in version.split(b'.'))
         except ValueError:
             cls.LOG.warning("Unable to parse Git version \"%s\".", version)
             return None
