@@ -32,24 +32,7 @@ from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
 
-__version__ = "1.19.4"
-
-
-try:
-    # Python 3.3+
-    from shlex import quote
-except ImportError:
-    _find_unsafe = re.compile(r'[^a-zA-Z0-9_@%+=:,./-]').search
-
-    def quote(s):
-        """Return a shell-escaped version of the string *s*."""
-        if not s:
-            return "''"
-
-        if _find_unsafe(s) is None:
-            return s
-
-        return "'" + s.replace("'", "'\"'\"'") + "'"
+__version__ = "1.20.0-dev0"
 
 
 try:
@@ -62,17 +45,6 @@ except ImportError:
         else:
             return filename
 
-
-def git_fsdecode(filename):
-    """
-    Decode filename from git output into str.
-    """
-    if sys.platform.startswith('win32'):
-        return filename.decode('utf-8')
-    else:
-        return fsdecode(filename)
-
-
 try:
     # Python 3.2+
     from os import fsencode
@@ -82,6 +54,16 @@ except ImportError:
             return filename.encode(sys.getfilesystemencoding(), 'strict')
         else:
             return filename
+
+
+def git_fsdecode(filename):
+    """
+    Decode filename from git output into str.
+    """
+    if sys.platform.startswith('win32'):
+        return filename.decode('utf-8')
+    else:
+        return fsdecode(filename)
 
 
 def git_fsencode(filename):
@@ -99,20 +81,22 @@ try:
     from os import fspath as _fspath
 
     def fspath(filename, decoder=fsdecode, encoder=fsencode):
+        """
+        Convert filename into bytes or str, depending on what's the best type
+        to represent paths for current Python and platform.
+        """
         # Python 3.6+: str can represent any path (PEP 383)
         #   str is not required on Windows (PEP 529)
         # Decoding is still applied for consistency and to follow PEP 519 recommendation.
         return decoder(_fspath(filename))
 except ImportError:
     def fspath(filename, decoder=fsdecode, encoder=fsencode):
-        """
-        Python 3.4 and 3.5: str can represent any path (PEP 383),
-          but str is required on Windows (no PEP 529)
-
-        Python 2.6 and 2.7: str cannot represent any path (no PEP 383),
-          str is required on Windows (no PEP 529)
-          bytes is required on POSIX (no PEP 383)
-        """
+        # Python 3.4 and 3.5: str can represent any path (PEP 383),
+        #   but str is required on Windows (no PEP 529)
+        #
+        # Python 2.6 and 2.7: str cannot represent any path (no PEP 383),
+        #   str is required on Windows (no PEP 529)
+        #   bytes is required on POSIX (no PEP 383)
         if sys.version_info > (3,):
             import pathlib
             if isinstance(filename, pathlib.PurePath):
@@ -167,13 +151,10 @@ class GitArchiver(object):
                 bar
 
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
-        @type exclude: bool
 
         @param force_sub: Determines whether submodules are initialized and updated before archiving.
-        @type force_sub: bool
 
         @param extra: List of extra paths to include in the resulting archive.
-        @type extra: list
 
         @param main_repo_abspath: Absolute path to the main repository (or one of subdirectories).
             If given path is path to a subdirectory (but not a submodule directory!) it will be replaced
@@ -182,7 +163,6 @@ class GitArchiver(object):
 
         @param git_version: Version of Git that determines whether various workarounds are on.
             If None, tries to resolve via Git's CLI.
-        @type git_version: tuple or None
         """
         self._should_decode_path = None
         self._check_attr_gens = {}
@@ -217,11 +197,11 @@ class GitArchiver(object):
         @param output_path: Output file path.
 
         @param dry_run: Determines whether create should do nothing but print what it would archive.
-        @type dry_run: bool
 
         @param output_format: Determines format of the output archive. If None, format is determined from extension
             of output_file_path.
-        @type output_format: str
+
+        @param compresslevel: Optional compression level. Interpretation depends on the output format.
         """
         output_path = fspath(output_path)
 
@@ -291,7 +271,6 @@ class GitArchiver(object):
         @param repo_file_path: Path to a file relative to repo_abspath.
 
         @return: True if file should be excluded. Otherwise False.
-        @rtype: bool
         """
         next(self._check_attr_gens[repo_abspath])
         attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
@@ -303,7 +282,6 @@ class GitArchiver(object):
 
         @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
-        @type archiver: Callable
         """
         for file_path in self.extra:
             archiver(path.abspath(file_path), path.join(self.prefix, file_path))
@@ -323,7 +301,6 @@ class GitArchiver(object):
         @param repo_path: Path to the git submodule repository relative to main_repo_abspath.
 
         @return: Iterator to traverse files under git control relative to main_repo_abspath.
-        @rtype: Iterable
         """
         repo_abspath = path.join(self.main_repo_abspath, fspath(repo_path))
         assert repo_abspath not in self._check_attr_gens
@@ -399,8 +376,6 @@ class GitArchiver(object):
         @param repo_abspath: Absolute path to a git repository.
 
         @param attrs: Attributes to check
-
-        @rtype: generator
         """
         def make_process():
             env = dict(environ, GIT_FLUSH='1')
@@ -484,7 +459,7 @@ class GitArchiver(object):
                 repo_file_attrs = {}
 
                 for path, attr, value in reader(process, repo_file_path):
-                    attr = attr if attr in attrs else attr.decode('utf-8')  # use str or bytes depending on what user passed
+                    attr = attr.decode('utf-8')
                     repo_file_attrs[attr] = value
 
                 yield repo_file_attrs
@@ -508,12 +483,10 @@ class GitArchiver(object):
         Run git shell command, read output and decode it into a unicode string.
 
         @param cmd: Command to be executed.
-        @type cmd: str
 
         @param cwd: Working directory.
 
         @return: Output of the command.
-        @rtype: bytes
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
@@ -534,8 +507,6 @@ class GitArchiver(object):
         Return version of git current shell points to.
 
         If version cannot be parsed None is returned.
-
-        @rtype: tuple or None
         """
         try:
             output = cls.run_git_shell('git version')
