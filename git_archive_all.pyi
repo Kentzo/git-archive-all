@@ -23,7 +23,6 @@ class GitArchiver(object):
     ZIPFILE_FORMATS: ClassVar[Tuple[str]]
     LOG: ClassVar[logging.Logger]
 
-    _should_decode_path: Optional[bool]
     _check_attr_gens: Dict[str, CheckGitAttrGen]
     git_version: Optional[Tuple[int]]
     main_repo_abspath: PathStr

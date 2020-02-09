@@ -164,7 +164,6 @@ class GitArchiver(object):
         @param git_version: Version of Git that determines whether various workarounds are on.
             If None, tries to resolve via Git's CLI.
         """
-        self._should_decode_path = None
         self._check_attr_gens = {}
 
         if git_version is None:
