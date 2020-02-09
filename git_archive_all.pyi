@@ -60,3 +60,6 @@ class GitArchiver(object):
 
     @classmethod
     def get_git_version(cls) -> Optional[Tuple[int]]: ...
+
+    @classmethod
+    def list_repo_files(cls, repo_abspath: PathStr) -> Generator[PathStr, None, None]: ...

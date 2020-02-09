@@ -300,29 +300,19 @@ class GitArchiver(object):
 
         @param repo_path: Path to the git submodule repository relative to main_repo_abspath.
 
-        @return: Iterator to traverse files under git control relative to main_repo_abspath.
+        @return: Generator to traverse files under git control relative to main_repo_abspath.
         """
         repo_abspath = path.join(self.main_repo_abspath, fspath(repo_path))
         assert repo_abspath not in self._check_attr_gens
         self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'])
 
         try:
-            repo_file_paths = self.run_git_shell(
-                'git ls-files -z --cached --full-name --no-empty-directory',
-                cwd=repo_abspath
-            )
-            repo_file_paths = repo_file_paths.split(b'\0')[:-1]
-
-            if sys.platform.startswith('win32'):
-                repo_file_paths = (git_fspath(p.replace(b'/', b'\\')) for p in repo_file_paths)
-            else:
-                repo_file_paths = map(git_fspath, repo_file_paths)
+            repo_file_paths = self.list_repo_files(repo_abspath)
 
             for repo_file_path in repo_file_paths:
                 repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
                 main_repo_file_path = path.join(repo_path, repo_file_path)  # relative to main_repo_abspath
 
-                # Only list symlinks and files.
                 if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
                     continue
 
@@ -525,6 +515,21 @@ class GitArchiver(object):
         except ValueError:
             cls.LOG.warning("Unable to parse Git version \"%s\".", version)
             return None
+
+    @classmethod
+    def list_repo_files(cls, repo_abspath):
+        repo_file_paths = cls.run_git_shell(
+            'git ls-files -z --cached --full-name --no-empty-directory',
+            cwd=repo_abspath
+        )
+        repo_file_paths = repo_file_paths.split(b'\0')[:-1]
+
+        if sys.platform.startswith('win32'):
+            repo_file_paths = (git_fspath(p.replace(b'/', b'\\')) for p in repo_file_paths)
+        else:
+            repo_file_paths = map(git_fspath, repo_file_paths)
+
+        return repo_file_paths
 
 
 def main(argv=None):
