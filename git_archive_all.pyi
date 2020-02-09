@@ -4,6 +4,7 @@ from typing import Callable, Collection, ClassVar, Dict, Generator, Iterable, Li
 
 PathLike = Union[str, bytes, _PathLike]
 PathStr = Union[str, bytes]
+CheckGitAttrGen = Generator[Dict[str, bytes], PathStr, None]
 
 def fsdecode(filename: PathLike) -> str: ...
 
@@ -23,7 +24,7 @@ class GitArchiver(object):
     LOG: ClassVar[logging.Logger]
 
     _should_decode_path: Optional[bool]
-    _check_attr_gens: Dict[str, Generator[Dict[str, bytes], PathStr, None]]
+    _check_attr_gens: Dict[str, CheckGitAttrGen]
     git_version: Optional[Tuple[int]]
     main_repo_abspath: PathStr
     prefix: PathStr
@@ -51,7 +52,7 @@ class GitArchiver(object):
 
     def walk_git_files(self, repo_path: PathStr = None) -> Generator[PathStr, None, None]: ...
 
-    def check_git_attr(self, repo_abspath: PathStr, attrs: Collection[str]) -> Generator[Dict[str, bytes], PathStr, None]: ...
+    def check_git_attr(self, repo_abspath: PathStr, attrs: Collection[str]) -> CheckGitAttrGen: ...
 
     def resolve_git_main_repo_abspath(self, abspath: PathLike) -> PathStr: ...
 
