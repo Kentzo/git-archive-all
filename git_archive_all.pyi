@@ -24,6 +24,8 @@ class GitArchiver(object):
     LOG: ClassVar[logging.Logger]
 
     _check_attr_gens: Dict[str, CheckGitAttrGen]
+    _ignored_paths_cache: Dict[PathStr, Dict[PathStr, bool]]
+
     git_version: Optional[Tuple[int]]
     main_repo_abspath: PathStr
     prefix: PathStr

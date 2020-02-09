@@ -165,6 +165,7 @@ class GitArchiver(object):
             If None, tries to resolve via Git's CLI.
         """
         self._check_attr_gens = {}
+        self._ignored_paths_cache = {}
 
         if git_version is None:
             git_version = self.get_git_version()
@@ -271,9 +272,26 @@ class GitArchiver(object):
 
         @return: True if file should be excluded. Otherwise False.
         """
-        next(self._check_attr_gens[repo_abspath])
-        attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
-        return attrs['export-ignore'] == b'set'
+        cache = self._ignored_paths_cache.setdefault(repo_abspath, {})
+
+        if repo_file_path not in cache:
+            next(self._check_attr_gens[repo_abspath])
+            attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
+            export_ignore_attr = attrs['export-ignore']
+
+            if export_ignore_attr == b'set':
+                cache[repo_file_path] = True
+            elif export_ignore_attr == b'unset':
+                cache[repo_file_path] = False
+            else:
+                repo_file_dir_path = path.dirname(repo_file_path)
+
+                if repo_file_dir_path:
+                    cache[repo_file_path] = self.is_file_excluded(repo_abspath, repo_file_dir_path)
+                else:
+                    cache[repo_file_path] = False
+
+        return cache[repo_file_path]
 
     def archive_all_files(self, archiver):
         """
