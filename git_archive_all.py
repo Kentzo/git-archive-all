@@ -547,16 +547,15 @@ def main(argv=None):
                       type='string',
                       dest='prefix',
                       default=None,
-                      help="""prepend PREFIX to each filename in the archive.
-                          OUTPUT_FILE name is used by default to avoid tarbomb.
-                          You can set it to '' in order to explicitly request tarbomb""")
+                      help="""prepend PREFIX to each filename in the archive;
+                      defaults to OUTPUT_FILE name""")
 
     parser.add_option('-C',
                       type='string',
                       dest='base_repo',
                       default=None,
-                      help="""use BASE_REPO as the main repository git working directory to archive.
-                           Defaults to current directory when empty""")
+                      help="""use BASE_REPO as the main git repository to archive;
+                      defaults to the current directory when empty""")
 
     parser.add_option('-v', '--verbose',
                       action='store_true',
@@ -567,23 +566,23 @@ def main(argv=None):
                       action='store_false',
                       dest='exclude',
                       default=True,
-                      help="don't read .gitattributes files for patterns containing export-ignore attrib")
+                      help="ignore the [-]export-ignore attribute in .gitattributes")
 
     parser.add_option('--force-submodules',
                       action='store_true',
                       dest='force_sub',
-                      help='force a git submodule init && git submodule update at each level before iterating submodules')
+                      help='force `git submodule init && git submodule update` at each level before iterating submodules')
 
     parser.add_option('--extra',
                       action='append',
                       dest='extra',
                       default=[],
-                      help="any additional files to include in the archive")
+                      help="additional files to include in the archive")
 
     parser.add_option('--dry-run',
                       action='store_true',
                       dest='dry_run',
-                      help="don't actually archive anything, just show what would be done")
+                      help="show files to be archived without actually creating the archive")
 
     for i in range(10):
         parser.add_option('-{0}'.format(i),

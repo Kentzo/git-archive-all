@@ -21,26 +21,30 @@ Archive repository with all its submodules.
 
 ::
 
-    git-archive-all [-v] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE
+    git-archive-all [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE
 
     Options:
 
-      --version             Show program's version number and exit.
+      --version             show program's version number and exit
 
-      -h, --help            Show this help message and exit.
+      -h, --help            show this help message and exit
 
-      -v, --verbose         Enable verbose mode.
+      -v, --verbose         enable verbose mode
 
-      --prefix=PREFIX       Prepend PREFIX to each filename in the archive. OUTPUT_FILE name is used by default to avoid tarbomb. You can set it to '' in order to explicitly request tarbomb.
+      --prefix=PREFIX       prepend PREFIX to each filename in the archive;
+                            defaults to OUTPUT_FILE name
 
-      -C BASE_REPO          Use BASE_REPO as the main repository git working directory to archive.  Defaults to current directory when empty
-      --no-exclude          Don't read .gitattributes files for patterns containing export-ignore attributes.
+      -C BASE_REPO          use BASE_REPO as the main git repository to archive;
+                            defaults to the current directory when empty
 
-      --force-submodules    Force a `git submodule init && git submodule update` at each level before iterating submodules
+      --no-exclude          ignore the [-]export-ignore attribute in .gitattributes
 
-      --extra               Include extra files to the resulting archive.
+      --force-submodules    force `git submodule init && git submodule update` at
+                            each level before iterating submodules
 
-      --dry-run             Don't actually archive anything, just show what would be done.
+      --extra=EXTRA         additional files to include in the archive
+
+      --dry-run             show files to be archived without actually creating the archive
 
 Questions & Answers
 -------------------
