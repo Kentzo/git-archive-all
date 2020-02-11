@@ -323,6 +323,16 @@ non_unicode_backslash_quoted['data'] = DirRecord({
     b'\"\\\xc2.dat\"': FileRecord('Although practicality beats purity.')
 })
 
+ignore_dir = {
+    '.gitattributes': FileRecord('.gitattributes export-ignore\n**/src export-ignore\ndata/src/__main__.py -export-ignore', excluded=True),
+    '__init__.py': FileRecord('#Beautiful is better than ugly.'),
+    'data': DirRecord({
+        'src': DirRecord({
+            '__init__.py': FileRecord('#Explicit is better than implicit.', excluded=True),
+            '__main__.py': FileRecord('#Simple is better than complex.')
+        })
+    })
+}
 
 skipif_file_darwin = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid macOS filename.')
 skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")
@@ -349,7 +359,8 @@ skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason=
     pytest.param(backslash_base, id='Backslash', marks=skipif_file_win32),
     pytest.param(backslash_quoted, id='Backslash (Quoted)', marks=skipif_file_win32),
     pytest.param(non_unicode_backslash_base, id='Non-Unicode Backslash', marks=[skipif_file_win32, skipif_file_darwin]),
-    pytest.param(non_unicode_backslash_quoted, id='Non-Unicode Backslash (Quoted)', marks=[skipif_file_win32, skipif_file_darwin])
+    pytest.param(non_unicode_backslash_quoted, id='Non-Unicode Backslash (Quoted)', marks=[skipif_file_win32, skipif_file_darwin]),
+    pytest.param(ignore_dir, id='Ignore Directory')
 ])
 def test_ignore(contents, tmpdir, git_env, monkeypatch):
     """
