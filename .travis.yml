@@ -94,7 +94,7 @@ before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then git -C "$(pyenv root)" fetch && git -C "$(pyenv root)" checkout master && git -C "$(pyenv root)" pull; fi
 
 install:
-  - python -m pip install tox==3.14.0 codecov==2.0.15 tox-pyenv==1.1.0 virtualenv==15.2.0
+  - python -m pip install -r travis-requirements.txt
   - pyenv install $(pyenv exec python --version >/dev/null 2>&1 && echo "--skip-existing" || echo "--force")  "${PYENV_VERSION}"
 
 script:
