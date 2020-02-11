@@ -55,13 +55,9 @@ jobs:
     - &osx
       os: osx
       language: generic
-      env: PYENV_VERSION=2.6.9 TOXENV=py26
-    - <<: *osx
       env: PYENV_VERSION=2.7.17 TOXENV=py27
     - <<: *osx
       env: PYENV_VERSION=2.7-dev TOXENV=py27
-    - <<: *osx
-      env: PYENV_VERSION=3.4.10 TOXENV=py34
     - <<: *osx
       env: PYENV_VERSION=3.5.8 TOXENV=py35
     - <<: *osx
@@ -98,7 +94,7 @@ before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then git -C "$(pyenv root)" fetch && git -C "$(pyenv root)" checkout master && git -C "$(pyenv root)" pull; fi
 
 install:
-  - python -m pip install tox==3.14.0 codecov==2.0.15 tox-pyenv==1.1.0 virtualenv==15.2.0
+  - python -m pip install -r travis-requirements.txt
   - pyenv install $(pyenv exec python --version >/dev/null 2>&1 && echo "--skip-existing" || echo "--force")  "${PYENV_VERSION}"
 
 script:
