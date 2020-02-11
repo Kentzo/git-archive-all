@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+1.21.0 (2020-02-11)
+-------------------
+
+- Fixed handling of files inside export-ignore directories (#78)
+
 1.20.0 (2019-11-07)
 -------------------
 
