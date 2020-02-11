@@ -55,13 +55,9 @@ jobs:
     - &osx
       os: osx
       language: generic
-      env: PYENV_VERSION=2.6.9 TOXENV=py26
-    - <<: *osx
       env: PYENV_VERSION=2.7.17 TOXENV=py27
     - <<: *osx
       env: PYENV_VERSION=2.7-dev TOXENV=py27
-    - <<: *osx
-      env: PYENV_VERSION=3.4.10 TOXENV=py34
     - <<: *osx
       env: PYENV_VERSION=3.5.8 TOXENV=py35
     - <<: *osx
