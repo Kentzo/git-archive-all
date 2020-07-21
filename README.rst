@@ -21,7 +21,7 @@ Archive repository with all its submodules.
 
 ::
 
-    git-archive-all [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude] [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE
+    git-archive-all [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-export-ignore] [--force-submodules] [--include EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE
 
     Options:
 
@@ -37,12 +37,12 @@ Archive repository with all its submodules.
       -C BASE_REPO          use BASE_REPO as the main git repository to archive;
                             defaults to the current directory when empty
 
-      --no-exclude          ignore the [-]export-ignore attribute in .gitattributes
+      --no-export-ignore    ignore the [-]export-ignore attribute in .gitattributes
 
       --force-submodules    force `git submodule init && git submodule update` at
                             each level before iterating submodules
 
-      --extra=EXTRA         additional files to include in the archive
+      --include=EXTRA         additional files to include in the archive
 
       --dry-run             show files to be archived without actually creating the archive
 

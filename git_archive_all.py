@@ -559,8 +559,8 @@ def main(argv=None):
     from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
-        usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude]"
-              " [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
+        usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-export-ignore]"
+              " [--force-submodules] [--include EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
 
@@ -583,7 +583,7 @@ def main(argv=None):
                       dest='verbose',
                       help='enable verbose mode')
 
-    parser.add_option('--no-exclude',
+    parser.add_option('--no-export-ignore', '--no-exclude',
                       action='store_false',
                       dest='exclude',
                       default=True,
@@ -594,7 +594,7 @@ def main(argv=None):
                       dest='force_sub',
                       help='force `git submodule init && git submodule update` at each level before iterating submodules')
 
-    parser.add_option('--extra',
+    parser.add_option('--include', '--extra',
                       action='append',
                       dest='extra',
                       default=[],
