@@ -140,7 +140,7 @@ class GitArchiver(object):
 
     LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None, git_version=None):
+    def __init__(self, prefix='', exclude=True, ignore_gitattributes=False, force_sub=False, extra=None, main_repo_abspath=None, git_version=None):
         """
         @param prefix: Prefix used to prepend all paths in the resulting archive.
             Extra file paths are only prefixed if they are not relative.
@@ -151,6 +151,8 @@ class GitArchiver(object):
                 bar
 
         @param exclude: Determines whether archiver should follow rules specified in .gitattributes files.
+
+        @param exclude: Ignore .gitattributes files.
 
         @param force_sub: Determines whether submodules are initialized and updated before archiving.
 
@@ -184,6 +186,7 @@ class GitArchiver(object):
 
         self.prefix = fspath(prefix)
         self.exclude = exclude
+        self.ignore_gitattributes = ignore_gitattributes
         self.extra = [fspath(e) for e in extra] if extra is not None else []
         self.force_sub = force_sub
 
@@ -286,10 +289,11 @@ class GitArchiver(object):
             else:
                 repo_file_dir_path = path.dirname(repo_file_path)
 
-                if repo_file_dir_path:
-                    cache[repo_file_path] = self.is_file_excluded(repo_abspath, repo_file_dir_path)
-                else:
-                    cache[repo_file_path] = False
+                if not self.ignore_gitattributes:
+                    if repo_file_dir_path:
+                        cache[repo_file_path] = self.is_file_excluded(repo_abspath, repo_file_dir_path)
+                    else:
+                        cache[repo_file_path] = False
 
         return cache[repo_file_path]
 
@@ -333,8 +337,9 @@ class GitArchiver(object):
                 if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
                     continue
 
-                if self.is_file_excluded(repo_abspath, repo_file_path):
-                    continue
+                if not self.ignore_gitattributes:
+                    if self.is_file_excluded(repo_abspath, repo_file_path):
+                        continue
 
                 yield main_repo_file_path
 
@@ -355,13 +360,15 @@ class GitArchiver(object):
                         repo_submodule_path = fspath(m.group(1))  # relative to repo_path
                         main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
-                        if self.is_file_excluded(repo_abspath, repo_submodule_path):
-                            continue
+                        if not self.ignore_gitattributes:
+                            if self.is_file_excluded(repo_abspath, repo_submodule_path):
+                                continue
 
                         for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
                             repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
-                            if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
-                                continue
+                            if not self.ignore_gitattributes:
+                                if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
+                                    continue
 
                             yield main_repo_submodule_file_path
             except IOError:
@@ -556,7 +563,7 @@ def main(argv=None):
     from optparse import OptionParser, SUPPRESS_HELP
 
     parser = OptionParser(
-        usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude]"
+        usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-exclude] [--ignore-gitattr]"
               " [--force-submodules] [--extra EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
         version="%prog {0}".format(__version__)
     )
@@ -585,6 +592,12 @@ def main(argv=None):
                       dest='exclude',
                       default=True,
                       help="ignore the [-]export-ignore attribute in .gitattributes")
+
+    parser.add_option('--ignore-gitattr',
+                      action='store_true',
+                      dest='ignore_gitattributes',
+                      default=False,
+                      help="ignore .gitattributes files")
 
     parser.add_option('--force-submodules',
                       action='store_true',
@@ -638,6 +651,7 @@ def main(argv=None):
         GitArchiver.LOG.setLevel(logging.DEBUG if options.verbose else logging.INFO)
         archiver = GitArchiver(options.prefix,
                                options.exclude,
+                               options.ignore_gitattributes,
                                options.force_sub,
                                options.extra,
                                path.abspath(options.base_repo) if options.base_repo is not None else None
