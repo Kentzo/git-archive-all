@@ -272,6 +272,9 @@ class GitArchiver(object):
 
         @return: True if file should be excluded. Otherwise False.
         """
+        if not self.exclude:
+            return False
+
         cache = self._ignored_paths_cache.setdefault(repo_abspath, {})
 
         if repo_file_path not in cache:

@@ -63,6 +63,11 @@ def git_env(tmpdir_factory):
             'email = git-archive-all@example.com\n',
         ])
 
+    # .gitmodules's content is dynamic and is maintained by git.
+    # It's therefore ignored solely to simplify tests.
+    #
+    # If test is run with the --no-exclude CLI option (or its exclude=False API equivalent)
+    # then the file itself is included while its content is discarded for the same reason.
     with tmpdir_factory.getbasetemp().join('.gitattributes').open('w+') as f:
         f.writelines([
             '.gitmodules export-ignore'
@@ -138,19 +143,23 @@ class Repo:
     def commit(self, message):
         check_call(['git', 'commit', '-m', 'init'], cwd=self.path)
 
-    def archive(self, path):
-        a = GitArchiver(main_repo_abspath=self.path)
+    def archive(self, path, exclude=True):
+        a = GitArchiver(exclude=exclude, main_repo_abspath=self.path)
         a.create(path)
 
 
-def make_expected_tree(contents):
+def make_expected_tree(contents, exclude=True):
     e = {}
 
     for k, v in contents.items():
-        if v.kind == 'file' and not v.excluded:
+        if v.kind == 'file' and not (exclude and v.excluded):
             e[k] = v.contents
-        elif v.kind in ('dir', 'submodule') and not v.excluded:
-            for nested_k, nested_v in make_expected_tree(v.contents).items():
+        elif v.kind in ('dir', 'submodule') and not (exclude and v.excluded):
+            # See the comment in git_env.
+            if v.kind == 'submodule' and not exclude:
+                e['.gitmodules'] = None
+
+            for nested_k, nested_v in make_expected_tree(v.contents, exclude).items():
                 nested_k = as_posix(os_path_join(k, nested_k))
                 e[nested_k] = nested_v
 
@@ -163,7 +172,12 @@ def make_actual_tree(tar_file):
     for m in tar_file.getmembers():
         if m.isfile():
             name = fspath(m.name)
-            a[name] = tar_file.extractfile(m).read().decode()
+
+            # See the comment in git_env.
+            if not name.endswith(fspath('.gitmodules')):
+                a[name] = tar_file.extractfile(m).read().decode()
+            else:
+                a[name] = None
         else:
             raise NotImplementedError
 
@@ -362,7 +376,11 @@ skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason=
     pytest.param(non_unicode_backslash_quoted, id='Non-Unicode Backslash (Quoted)', marks=[skipif_file_win32, skipif_file_darwin]),
     pytest.param(ignore_dir, id='Ignore Directory')
 ])
-def test_ignore(contents, tmpdir, git_env, monkeypatch):
+@pytest.mark.parametrize('exclude', [
+    pytest.param(True, id='With export-ignore'),
+    pytest.param(False, id='Without export-ignore'),
+])
+def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
     """
     Ensure that GitArchiver respects export-ignore.
     """
@@ -376,10 +394,10 @@ def test_ignore(contents, tmpdir, git_env, monkeypatch):
     repo.commit('init')
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    repo.archive(repo_tar_path)
+    repo.archive(repo_tar_path, exclude=exclude)
     repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
-    expected = make_expected_tree(contents)
+    expected = make_expected_tree(contents, exclude)
     actual = make_actual_tree(repo_tar)
 
     assert actual == expected
