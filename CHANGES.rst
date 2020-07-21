@@ -1,6 +1,13 @@
 CHANGES
 =======
 
+1.22.0 (2020-07-xx)
+-------------------
+
+- Fixed the --no-exclude flag. See #82
+- --no-exclude -> --no-export-ignore (backward compatibility is retained)
+- --extra -> --include (backward compatibility is retained)
+
 1.21.0 (2020-02-11)
 -------------------
 
