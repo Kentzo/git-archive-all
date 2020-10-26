@@ -1,23 +1,27 @@
-.. image:: https://img.shields.io/pypi/v/git-archive-all.svg
+| |pypi| |homebrew|
+| |implementations| |versions|
+| |travis| |coverage|
+
+.. |pypi| image:: https://img.shields.io/pypi/v/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: PyPI
-.. image:: https://img.shields.io/homebrew/v/git-archive-all.svg
+.. |homebrew| image:: https://img.shields.io/homebrew/v/git-archive-all.svg
     :target: https://formulae.brew.sh/formula/git-archive-all
     :alt: Homebrew
-.. image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
-    :target: https://travis-ci.org/Kentzo/git-archive-all
-    :alt: Travis
-.. image:: https://codecov.io/gh/Kentzo/git-archive-all/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/Kentzo/git-archive-all/branch/master
-    :alt: Coverage
-.. image:: https://img.shields.io/pypi/pyversions/git-archive-all.svg
+.. |versions| image:: https://img.shields.io/pypi/pyversions/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: Supported Python versions
-.. image:: https://img.shields.io/pypi/implementation/git-archive-all.svg
+.. |implementations| image:: https://img.shields.io/pypi/implementation/git-archive-all.svg
     :target: https://pypi.python.org/pypi/git-archive-all
     :alt: Supported Python implementations
+.. |travis| image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
+    :target: https://travis-ci.org/Kentzo/git-archive-all
+    :alt: Travis
+.. |coverage| image:: https://codecov.io/gh/Kentzo/git-archive-all/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/Kentzo/git-archive-all/branch/master
+    :alt: Coverage
 
-Archive repository with all its submodules.
+Archive a repository with all its submodules.
 
 ::
 
@@ -42,7 +46,7 @@ Archive repository with all its submodules.
       --force-submodules    force `git submodule init && git submodule update` at
                             each level before iterating submodules
 
-      --include=EXTRA         additional files to include in the archive
+      --include=EXTRA       additional files to include in the archive
 
       --dry-run             show files to be archived without actually creating the archive
 

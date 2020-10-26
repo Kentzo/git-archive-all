@@ -10,6 +10,7 @@ import os
 from subprocess import check_call
 import sys
 from tarfile import TarFile, PAX_FORMAT
+import warnings
 
 import pycodestyle
 import pytest
@@ -384,8 +385,13 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
     """
     Ensure that GitArchiver respects export-ignore.
     """
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
