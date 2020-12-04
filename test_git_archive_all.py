@@ -55,13 +55,13 @@ def git_env(tmpdir_factory):
         'HOME': tmpdir_factory.getbasetemp().strpath
     }
 
-    with tmpdir_factory.getbasetemp().join('.gitconfig').open('w+') as f:
+    with tmpdir_factory.getbasetemp().join('.gitconfig').open('wb+') as f:
         f.writelines([
-            '[core]\n',
-            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes').strpath)),
-            '[user]\n',
-            'name = git-archive-all\n',
-            'email = git-archive-all@example.com\n',
+            b'[core]\n',
+            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes').strpath)).encode(),
+            b'[user]\n',
+            b'name = git-archive-all\n',
+            b'email = git-archive-all@example.com\n',
         ])
 
     # .gitmodules's content is dynamic and is maintained by git.
@@ -69,9 +69,9 @@ def git_env(tmpdir_factory):
     #
     # If test is run with the --no-exclude CLI option (or its exclude=False API equivalent)
     # then the file itself is included while its content is discarded for the same reason.
-    with tmpdir_factory.getbasetemp().join('.gitattributes').open('w+') as f:
+    with tmpdir_factory.getbasetemp().join('.gitattributes').open('wb+') as f:
         f.writelines([
-            '.gitmodules export-ignore'
+            b'.gitmodules export-ignore\n'
         ])
 
     return e
@@ -116,7 +116,7 @@ class Repo:
     def add_file(self, rel_path, contents):
         file_path = os_path_join(self.path, rel_path)
 
-        with open(file_path, 'w') as f:
+        with open(file_path, 'wb') as f:
             f.write(contents)
 
         check_call(['git', 'add', as_posix(os.path.normpath(file_path))], cwd=self.path)
@@ -176,7 +176,7 @@ def make_actual_tree(tar_file):
 
             # See the comment in git_env.
             if not name.endswith(fspath('.gitmodules')):
-                a[name] = tar_file.extractfile(m).read().decode()
+                a[name] = tar_file.extractfile(m).read()
             else:
                 a[name] = None
         else:
@@ -187,164 +187,164 @@ def make_actual_tree(tar_file):
 
 base = {
     'app': DirRecord({
-        '__init__.py': FileRecord('#Beautiful is better than ugly.'),
+        '__init__.py': FileRecord(b'#Beautiful is better than ugly.'),
     }),
     'lib': SubmoduleRecord({
-        '__init__.py': FileRecord('#Explicit is better than implicit.'),
+        '__init__.py': FileRecord(b'#Explicit is better than implicit.'),
         'extra': SubmoduleRecord({
-            '__init__.py': FileRecord('#Simple is better than complex.'),
+            '__init__.py': FileRecord(b'#Simple is better than complex.'),
         })
     })
 }
 
 base_quoted = deepcopy(base)
 base_quoted['data'] = DirRecord({
-    '\"hello world.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\'hello world.dat\'': FileRecord('Although practicality beats purity.')
+    '\"hello world.dat\"': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\'hello world.dat\'': FileRecord(b'Although practicality beats purity.')
 })
 
 ignore_in_root = deepcopy(base)
-ignore_in_root['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
+ignore_in_root['.gitattributes'] = FileRecord(b'tests/__init__.py export-ignore')
 ignore_in_root['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_submodule = deepcopy(base)
-ignore_in_submodule['lib']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
+ignore_in_submodule['lib']['.gitattributes'] = FileRecord(b'tests/__init__.py export-ignore')
 ignore_in_submodule['lib']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule = deepcopy(base)
-ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord('tests/__init__.py export-ignore')
+ignore_in_nested_submodule['lib']['extra']['.gitattributes'] = FileRecord(b'tests/__init__.py export-ignore')
 ignore_in_nested_submodule['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_submodule_from_root = deepcopy(base)
-ignore_in_submodule_from_root['.gitattributes'] = FileRecord('lib/tests/__init__.py export-ignore')
+ignore_in_submodule_from_root['.gitattributes'] = FileRecord(b'lib/tests/__init__.py export-ignore')
 ignore_in_submodule_from_root['lib']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_root = deepcopy(base)
-ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord('lib/extra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_root['.gitattributes'] = FileRecord(b'lib/extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_root['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 ignore_in_nested_submodule_from_submodule = deepcopy(base)
-ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord('extra/tests/__init__.py export-ignore')
+ignore_in_nested_submodule_from_submodule['lib']['.gitattributes'] = FileRecord(b'extra/tests/__init__.py export-ignore')
 ignore_in_nested_submodule_from_submodule['lib']['extra']['tests'] = DirRecord({
-    '__init__.py': FileRecord('#Complex is better than complicated.', excluded=True)
+    '__init__.py': FileRecord(b'#Complex is better than complicated.', excluded=True)
 })
 
 unset_export_ignore = deepcopy(base)
-unset_export_ignore['.gitattributes'] = FileRecord('.* export-ignore\n*.htaccess -export-ignore', excluded=True)
-unset_export_ignore['.a'] = FileRecord('Flat is better than nested.', excluded=True)
-unset_export_ignore['.b'] = FileRecord('Sparse is better than dense.', excluded=True)
-unset_export_ignore['.htaccess'] = FileRecord('Readability counts.')
+unset_export_ignore['.gitattributes'] = FileRecord(b'.* export-ignore\n*.htaccess -export-ignore', excluded=True)
+unset_export_ignore['.a'] = FileRecord(b'Flat is better than nested.', excluded=True)
+unset_export_ignore['.b'] = FileRecord(b'Sparse is better than dense.', excluded=True)
+unset_export_ignore['.htaccess'] = FileRecord(b'Readability counts.')
 
 unicode_base = deepcopy(base)
 unicode_base['data'] = DirRecord({
-    'مرحبا بالعالم.dat': FileRecord('Special cases aren\'t special enough to break the rules.')
+    'مرحبا بالعالم.dat': FileRecord(b'Special cases aren\'t special enough to break the rules.')
 })
 
 unicode_quoted = deepcopy(base)
 unicode_quoted['data'] = DirRecord({
-    '\"مرحبا بالعالم.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\'привет мир.dat\'': FileRecord('Although practicality beats purity.')
+    '\"مرحبا بالعالم.dat\"': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\'привет мир.dat\'': FileRecord(b'Although practicality beats purity.')
 })
 
 brackets_base = deepcopy(base)
 brackets_base['data'] = DirRecord({
-    '[.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '(.dat': FileRecord('Although practicality beats purity.'),
-    '{.dat': FileRecord('Errors should never pass silently.'),
-    '].dat': FileRecord('Unless explicitly silenced.'),
-    ').dat': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
-    '}.dat': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
-    '[].dat': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
-    '().dat': FileRecord('Now is better than never.'),
-    '{}.dat': FileRecord('Although never is often better than *right* now.'),
+    '[.dat': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '(.dat': FileRecord(b'Although practicality beats purity.'),
+    '{.dat': FileRecord(b'Errors should never pass silently.'),
+    '].dat': FileRecord(b'Unless explicitly silenced.'),
+    ').dat': FileRecord(b'In the face of ambiguity, refuse the temptation to guess.'),
+    '}.dat': FileRecord(b'There should be one-- and preferably only one --obvious way to do it.'),
+    '[].dat': FileRecord(b'Although that way may not be obvious at first unless you\'re Dutch.'),
+    '().dat': FileRecord(b'Now is better than never.'),
+    '{}.dat': FileRecord(b'Although never is often better than *right* now.'),
 })
 
 brackets_quoted = deepcopy(base)
 brackets_quoted['data'] = DirRecord({
-    '\"[.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\'[.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\"(.dat\"': FileRecord('Although practicality beats purity.'),
-    '\'(.dat\'': FileRecord('Although practicality beats purity.'),
-    '\"{.dat\"': FileRecord('Errors should never pass silently.'),
-    '\'{.dat\'': FileRecord('Errors should never pass silently.'),
-    '\"].dat\"': FileRecord('Unless explicitly silenced.'),
-    '\'].dat\'': FileRecord('Unless explicitly silenced.'),
-    '\").dat\"': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
-    '\').dat\'': FileRecord('In the face of ambiguity, refuse the temptation to guess.'),
-    '\"}.dat\"': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
-    '\'}.dat\'': FileRecord('There should be one-- and preferably only one --obvious way to do it.'),
-    '\"[].dat\"': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
-    '\'[].dat\'': FileRecord('Although that way may not be obvious at first unless you\'re Dutch.'),
-    '\"().dat\"': FileRecord('Now is better than never.'),
-    '\'().dat\'': FileRecord('Now is better than never.'),
-    '\"{}.dat\"': FileRecord('Although never is often better than *right* now.'),
-    '\'{}.dat\'': FileRecord('Although never is often better than *right* now.'),
+    '\"[.dat\"': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\'[.dat\'': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\"(.dat\"': FileRecord(b'Although practicality beats purity.'),
+    '\'(.dat\'': FileRecord(b'Although practicality beats purity.'),
+    '\"{.dat\"': FileRecord(b'Errors should never pass silently.'),
+    '\'{.dat\'': FileRecord(b'Errors should never pass silently.'),
+    '\"].dat\"': FileRecord(b'Unless explicitly silenced.'),
+    '\'].dat\'': FileRecord(b'Unless explicitly silenced.'),
+    '\").dat\"': FileRecord(b'In the face of ambiguity, refuse the temptation to guess.'),
+    '\').dat\'': FileRecord(b'In the face of ambiguity, refuse the temptation to guess.'),
+    '\"}.dat\"': FileRecord(b'There should be one-- and preferably only one --obvious way to do it.'),
+    '\'}.dat\'': FileRecord(b'There should be one-- and preferably only one --obvious way to do it.'),
+    '\"[].dat\"': FileRecord(b'Although that way may not be obvious at first unless you\'re Dutch.'),
+    '\'[].dat\'': FileRecord(b'Although that way may not be obvious at first unless you\'re Dutch.'),
+    '\"().dat\"': FileRecord(b'Now is better than never.'),
+    '\'().dat\'': FileRecord(b'Now is better than never.'),
+    '\"{}.dat\"': FileRecord(b'Although never is often better than *right* now.'),
+    '\'{}.dat\'': FileRecord(b'Although never is often better than *right* now.'),
 })
 
 quote_base = deepcopy(base)
 quote_base['data'] = DirRecord({
-    '\'.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\".dat': FileRecord('Although practicality beats purity.'),
+    '\'.dat': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\".dat': FileRecord(b'Although practicality beats purity.'),
 })
 
 quote_quoted = deepcopy(base)
 quote_quoted['data'] = DirRecord({
-    '\"\'.dat\"': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\'\'.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\"\".dat\"': FileRecord('Although practicality beats purity.'),
-    '\'\".dat\'': FileRecord('Although practicality beats purity.'),
+    '\"\'.dat\"': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\'\'.dat\'': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\"\".dat\"': FileRecord(b'Although practicality beats purity.'),
+    '\'\".dat\'': FileRecord(b'Although practicality beats purity.'),
 })
 
 nonunicode_base = deepcopy(base)
 nonunicode_base['data'] = DirRecord({
-    b'test.\xc2': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    b'test.\xc2': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
 })
 
 nonunicode_quoted = deepcopy(base)
 nonunicode_quoted['data'] = DirRecord({
-    b'\'test.\xc2\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    b'\"test.\xc2\"': FileRecord('Although practicality beats purity.'),
+    b'\'test.\xc2\'': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    b'\"test.\xc2\"': FileRecord(b'Although practicality beats purity.'),
 })
 
 backslash_base = deepcopy(base)
 backslash_base['data'] = DirRecord({
-    '\\.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    '\\.dat': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
 })
 
 backslash_quoted = deepcopy(base)
 backslash_quoted['data'] = DirRecord({
-    '\'\\.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    '\"\\.dat\"': FileRecord('Although practicality beats purity.')
+    '\'\\.dat\'': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    '\"\\.dat\"': FileRecord(b'Although practicality beats purity.')
 })
 
 non_unicode_backslash_base = deepcopy(base)
 non_unicode_backslash_base['data'] = DirRecord({
-    b'\\\xc2.dat': FileRecord('Special cases aren\'t special enough to break the rules.'),
+    b'\\\xc2.dat': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
 })
 
 non_unicode_backslash_quoted = deepcopy(base)
 non_unicode_backslash_quoted['data'] = DirRecord({
-    b'\'\\\xc2.dat\'': FileRecord('Special cases aren\'t special enough to break the rules.'),
-    b'\"\\\xc2.dat\"': FileRecord('Although practicality beats purity.')
+    b'\'\\\xc2.dat\'': FileRecord(b'Special cases aren\'t special enough to break the rules.'),
+    b'\"\\\xc2.dat\"': FileRecord(b'Although practicality beats purity.')
 })
 
 ignore_dir = {
-    '.gitattributes': FileRecord('.gitattributes export-ignore\n**/src export-ignore\ndata/src/__main__.py -export-ignore', excluded=True),
-    '__init__.py': FileRecord('#Beautiful is better than ugly.'),
+    '.gitattributes': FileRecord(b'.gitattributes export-ignore\n**/src export-ignore\ndata/src/__main__.py -export-ignore', excluded=True),
+    '__init__.py': FileRecord(b'#Beautiful is better than ugly.'),
     'data': DirRecord({
         'src': DirRecord({
-            '__init__.py': FileRecord('#Explicit is better than implicit.', excluded=True),
-            '__main__.py': FileRecord('#Simple is better than complex.')
+            '__init__.py': FileRecord(b'#Explicit is better than implicit.', excluded=True),
+            '__main__.py': FileRecord(b'#Simple is better than complex.')
         })
     })
 }
@@ -385,7 +385,6 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
     """
     Ensure that GitArchiver respects export-ignore.
     """
-
     # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -412,8 +411,12 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
 def test_cli(tmpdir, git_env, monkeypatch):
     contents = base
 
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
