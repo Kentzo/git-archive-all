@@ -1,21 +1,25 @@
 git:
   depth: 1
 
-before_cache:
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew cleanup; fi
-
 cache:
   directories:
     - $HOME/.cache/pyenv
     - /opt/pyenv/versions/$PYENV_VERSION
     - $HOME/pyenv/versions/$PYENV_VERSION
-    - $HOME/Library/Caches/Homebrew
   pip: true
 
 env:
   global:
     - PYTHON_BUILD_CACHE_PATH=$HOME/.cache/pyenv
-    - HOMEBREW_NO_INSTALL_CLEANUP=1
+
+addons:
+  homebrew:
+    packages:
+      - pyenv
+      - openssl
+      - readline
+      - xz
+    update: true
 
 jobs:
   fast_finish: true
@@ -43,11 +47,11 @@ jobs:
     - <<: *linux
       env: PYENV_VERSION=3.7-dev TOXENV=py37
     - <<: *linux
-      env: PYENV_VERSION=3.8.6 TOXENV=py38
+      env: PYENV_VERSION=3.8.7 TOXENV=py38
     - <<: *linux
       env: PYENV_VERSION=3.8-dev TOXENV=py38
     - <<: *linux
-      env: PYENV_VERSION=3.9.0 TOXENV=py39
+      env: PYENV_VERSION=3.9.1 TOXENV=py39
     - <<: *linux
       env: PYENV_VERSION=3.9-dev TOXENV=py39
     - <<: *linux
@@ -73,11 +77,11 @@ jobs:
     - <<: *osx
       env: PYENV_VERSION=3.7-dev TOXENV=py37
     - <<: *osx
-      env: PYENV_VERSION=3.8.6 TOXENV=py38
+      env: PYENV_VERSION=3.8.7 TOXENV=py38
     - <<: *osx
       env: PYENV_VERSION=3.8-dev TOXENV=py38
     - <<: *osx
-      env: PYENV_VERSION=3.9.0 TOXENV=py39
+      env: PYENV_VERSION=3.9.1 TOXENV=py39
     - <<: *osx
       env: PYENV_VERSION=3.9-dev TOXENV=py39
     - <<: *osx
@@ -93,8 +97,7 @@ jobs:
     - env: PYENV_VERSION=3.9-dev TOXENV=py39
 
 before_install:
-  - mkdir -p ${HOME}/.cache/pyenv
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && (brew upgrade pyenv || true) && (brew install openssl || true) && (brew install readline || true) && (brew install xz || true); fi
+  - mkdir -p "${PYTHON_BUILD_CACHE_PATH}"
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then git -C "$(pyenv root)" fetch && git -C "$(pyenv root)" checkout master && git -C "$(pyenv root)" pull; fi
 
 install:
