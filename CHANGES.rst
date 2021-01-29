@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+1.23.0 (2021-01-29)
+-------------------
+
+- List of submodules is retrieved via git instead of parsing .gitmodules. See #85
+
 1.22.0 (2020-08-04)
 -------------------
 
