@@ -65,3 +65,6 @@ class GitArchiver(object):
 
     @classmethod
     def list_repo_files(cls, repo_abspath: PathStr) -> Generator[PathStr, None, None]: ...
+
+    @classmethod
+    def list_repo_submodules(cls, repo_abspath: PathStr) -> Generator[PathStr, None, None]: ...
