@@ -19,6 +19,7 @@ addons:
       - openssl
       - readline
       - xz
+      - zlib
     update: true
 
 jobs:
