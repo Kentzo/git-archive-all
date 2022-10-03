@@ -34,6 +34,7 @@ class PyTest(TestCommand):
 setup(
     version=verstr,
     py_modules=['git_archive_all'],
+    package_data={'git_archive_all': ['py.typed', '*.pyi']},
     entry_points={'console_scripts': 'git-archive-all=git_archive_all:main'},
     cmdclass={"test": PyTest},
 )

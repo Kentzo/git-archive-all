@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+1.23.1 (2022-10-02)
+-------------------
+
+- Include typing information in PyPI and source distributions.
+
 1.23.0 (2021-01-29)
 -------------------
 
