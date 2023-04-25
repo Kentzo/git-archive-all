@@ -400,10 +400,10 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.archive(repo_tar_path, exclude=exclude)
-    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
-    expected = make_expected_tree(contents, exclude)
-    actual = make_actual_tree(repo_tar)
+    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        expected = make_expected_tree(contents, exclude)
+        actual = make_actual_tree(repo_tar)
 
     assert actual == expected
 
@@ -426,10 +426,10 @@ def test_cli(tmpdir, git_env, monkeypatch):
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
-    repo_tar = TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8')
 
-    expected = make_expected_tree(contents)
-    actual = make_actual_tree(repo_tar)
+    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        expected = make_expected_tree(contents)
+        actual = make_actual_tree(repo_tar)
 
     assert actual == expected
 
