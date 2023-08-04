@@ -1,5 +1,5 @@
 prefix=/usr/local
-SOURCE_FILE=git_archive_all.py
+SOURCE_FILE=git_archive_all/__init__.py
 TARGET_DIR=$(prefix)/bin
 TARGET_FILE=$(TARGET_DIR)/git-archive-all
 

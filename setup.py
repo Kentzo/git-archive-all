@@ -5,7 +5,7 @@ from setuptools import setup
 from setuptools.command.test import test as TestCommand
 
 # Parse the version from the file.
-verstrline = open('git_archive_all.py', "rt").read()
+verstrline = open('git_archive_all/__init__.py', "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)
 if mo:
@@ -33,7 +33,7 @@ class PyTest(TestCommand):
 
 setup(
     version=verstr,
-    py_modules=['git_archive_all'],
+    packages=['git_archive_all'],
     package_data={'git_archive_all': ['py.typed', '*.pyi']},
     entry_points={'console_scripts': 'git-archive-all=git_archive_all:main'},
     cmdclass={"test": PyTest},
