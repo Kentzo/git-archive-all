@@ -465,6 +465,7 @@ class GitArchiver(object):
         finally:
             process.stdin.close()
             process.wait()
+            process.stdout.close()
 
     def resolve_git_main_repo_abspath(self, abspath):
         """
