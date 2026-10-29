@@ -257,10 +257,11 @@ class GitArchiver(object):
             def archiver(file_path, arcname):
                 self.LOG.info(fspath("{} => {}").format(file_path, arcname))
 
-        self.archive_all_files(archiver)
-
-        if archive is not None:
-            archive.close()
+        try:
+            self.archive_all_files(archiver)
+        finally:
+            if archive is not None:
+                archive.close()
 
     def is_file_excluded(self, repo_abspath, repo_file_path):
         """
