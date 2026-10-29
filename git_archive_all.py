@@ -28,7 +28,7 @@ from __future__ import unicode_literals
 
 from contextlib import closing
 import logging
-from os import environ, extsep, path, readlink
+from os import environ, extsep, path, readlink, remove
 from subprocess import CalledProcessError, Popen, PIPE
 import sys
 import re
@@ -267,11 +267,32 @@ class GitArchiver(object):
             def archiver(file_path, arcname):
                 self.LOG.info(fspath("{} => {}").format(file_path, arcname))
 
+        is_archived = False
+
         try:
             self.archive_all_files(archiver)
+            is_archived = True
         finally:
             if archive is not None:
-                archive.close()
+                if is_archived:
+                    archive.close()
+                elif sys.version_info >= (3,):
+                    # Python 3: cleanup errors are chained to the original exception.
+                    try:
+                        archive.close()
+                    finally:
+                        remove(path.abspath(output_path))
+                else:
+                    # Python 2.7: replaces the original exception with cleanup errors, so they are only logged.
+                    try:
+                        archive.close()
+                    except BaseException as e:
+                        self.LOG.warning("Unable to close incomplete archive: {}".format(e))
+
+                    try:
+                        remove(path.abspath(output_path))
+                    except BaseException as e:
+                        self.LOG.warning("Unable to remove incomplete archive: {}".format(e))
 
     def is_file_excluded(self, repo_abspath, repo_file_path):
         """
