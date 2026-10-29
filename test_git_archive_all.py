@@ -17,6 +17,11 @@ try:
 except ImportError:
     lzma = None
 
+try:
+    from compression import zstd
+except ImportError:
+    zstd = None
+
 import pycodestyle
 import pytest
 
@@ -455,6 +460,7 @@ def test_cli(tmpdir, git_env, monkeypatch):
     'tgz',
     'tbz2',
     pytest.param('txz', marks=pytest.mark.skipif(lzma is None, reason="Requires lzma.")),
+    pytest.param('tzst', marks=pytest.mark.skipif(zstd is None, reason="Requires zstd.")),
 ])
 @pytest.mark.parametrize('compresslevel', ['-1', '-9'])
 def test_cli_compresslevel(output_format, compresslevel, tmpdir, git_env, monkeypatch):
