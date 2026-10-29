@@ -12,6 +12,11 @@ import sys
 from tarfile import TarFile, PAX_FORMAT
 import warnings
 
+try:
+    import lzma
+except ImportError:
+    lzma = None
+
 import pycodestyle
 import pytest
 
@@ -444,6 +449,62 @@ def test_cli(tmpdir, git_env, monkeypatch):
         actual = make_actual_tree(repo_tar)
 
     assert actual == expected
+
+
+@pytest.mark.parametrize('output_format', [
+    'tgz',
+    'tbz2',
+    pytest.param('txz', marks=pytest.mark.skipif(lzma is None, reason="Requires lzma.")),
+])
+@pytest.mark.parametrize('compresslevel', ['-1', '-9'])
+def test_cli_compresslevel(output_format, compresslevel, tmpdir, git_env, monkeypatch):
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    repo_archive_path = os_path_join(tmpdir.strpath, 'repo.' + output_format)
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, compresslevel, repo_archive_path])
+
+    with TarFile.open(repo_archive_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        expected = make_expected_tree(contents)
+        actual = make_actual_tree(repo_tar)
+
+    assert actual == expected
+
+
+def test_cli_compresslevel_tar(tmpdir, git_env, monkeypatch):
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+
+    with pytest.raises(SystemExit) as e:
+        git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, '-9', repo_tar_path])
+
+    assert e.value.code == 2
 
 
 @pytest.mark.parametrize('version', [

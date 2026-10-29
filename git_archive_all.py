@@ -236,8 +236,13 @@ class GitArchiver(object):
                 mode = self.TARFILE_FORMATS[output_format]
 
                 if compresslevel is not None:
+                    if mode == 'w:xz':
+                        compress_kwargs = {'preset': compresslevel}
+                    else:
+                        compress_kwargs = {'compresslevel': compresslevel}
+
                     try:
-                        archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
+                        archive = tarfile.open(path.abspath(output_path), mode, **compress_kwargs)
                     except TypeError:
                         raise ValueError("{0} cannot be compressed".format(output_format))
                 else:
