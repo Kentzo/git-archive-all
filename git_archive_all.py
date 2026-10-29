@@ -185,8 +185,19 @@ class GitArchiver(object):
 
         self.prefix = fspath(prefix)
         self.exclude = exclude
-        self.extra = [fspath(e) for e in extra] if extra is not None else []
         self.force_sub = force_sub
+        self.extra = [fspath(e) for e in extra] if extra is not None else []
+
+        # Match git's prepare_submodule_repo_env() when running git commands in submodules:
+        # clear repository-local variables (e.g. GIT_DIR, GIT_WORK_TREE) that override cwd,
+        # but keep GIT_CONFIG_PARAMETERS and GIT_CONFIG_COUNT so that `git -c ...` options
+        # given to git-archive-all still apply.
+        self.git_submodule_clear_vars = self.get_git_local_env_vars()
+        for e in ('GIT_CONFIG_COUNT', 'GIT_CONFIG_PARAMETERS'):
+            try:
+                self.git_submodule_clear_vars.remove(e)
+            except ValueError:
+                pass
 
     def create(self, output_path, dry_run=False, output_format=None, compresslevel=None):
         """
@@ -333,12 +344,11 @@ class GitArchiver(object):
             for file_path in git_files:
                 archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
 
-    def walk_git_files(self, repo_path=fspath('')):
+    def walk_git_files(self, repo_path=fspath(''), env=None):
         """
         An iterator method that yields a file path relative to main_repo_abspath
-        for each file that should be included in the archive.
-        Skips those that match the exclusion patterns found in
-        any discovered .gitattributes files along the way.
+        for each file that should be included in the archive. Skips files that match
+        the exclusion patterns found in any discovered .gitattributes files along the way.
 
         Recurs into submodules as well.
 
@@ -348,10 +358,18 @@ class GitArchiver(object):
         """
         repo_abspath = path.join(self.main_repo_abspath, fspath(repo_path))
         assert repo_abspath not in self._check_attr_gens
-        self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'])
+        self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'], env=env)
+
+        if env is not None:
+            submodule_env = dict(env)
+        else:
+            submodule_env = self.git_env()
+
+        for e in self.git_submodule_clear_vars:
+            submodule_env.pop(e, None)
 
         try:
-            repo_file_paths = self.list_repo_files(repo_abspath)
+            repo_file_paths = self.list_repo_files(repo_abspath, env=env)
 
             for repo_file_path in repo_file_paths:
                 repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
@@ -366,16 +384,16 @@ class GitArchiver(object):
                 yield main_repo_file_path
 
             if self.force_sub:
-                self.run_git_shell('git submodule init', repo_abspath)
-                self.run_git_shell('git submodule update', repo_abspath)
+                self.run_git_shell('git submodule init', repo_abspath, env=env)
+                self.run_git_shell('git submodule update', repo_abspath, env=env)
 
-            for repo_submodule_path in self.list_repo_submodules(repo_abspath):  # relative to repo_path
+            for repo_submodule_path in self.list_repo_submodules(repo_abspath, env=env):  # relative to repo_path
                 if self.is_file_excluded(repo_abspath, repo_submodule_path):
                     continue
 
                 main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
-                with closing(self.walk_git_files(main_repo_submodule_path)) as git_files:
+                with closing(self.walk_git_files(main_repo_submodule_path, env=submodule_env)) as git_files:
                     for main_repo_submodule_file_path in git_files:
                         repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
 
@@ -387,7 +405,7 @@ class GitArchiver(object):
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
 
-    def check_git_attr(self, repo_abspath, attrs):
+    def check_git_attr(self, repo_abspath, attrs, env=None):
         """
         Generator that returns git attributes for received paths relative to repo_abspath.
 
@@ -401,8 +419,11 @@ class GitArchiver(object):
 
         @param attrs: Attributes to check
         """
+        if env is None:
+            env = self.git_env()
+        env = dict(env, GIT_FLUSH='1')
+
         def make_process():
-            env = self.git_env(GIT_FLUSH='1')
             cmd = 'git check-attr --stdin -z {}'.format(' '.join(attrs))
             return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
@@ -466,11 +487,11 @@ class GitArchiver(object):
             raise ValueError("{} is not part of a git repository ({})".format(abspath, e.returncode))
 
     @classmethod
-    def git_env(cls, **kwargs):
+    def git_env(cls):
         """
         Return environment for git shell commands.
         """
-        env = dict(environ, **kwargs)
+        env = dict(environ)
 
         if sys.platform.startswith('win32') and 'NoDefaultCurrentDirectoryInExePath' not in environ:
             env['NoDefaultCurrentDirectoryInExePath'] = '1'
@@ -478,7 +499,7 @@ class GitArchiver(object):
         return env
 
     @classmethod
-    def run_git_shell(cls, cmd, cwd=None):
+    def run_git_shell(cls, cmd, cwd=None, env=None):
         """
         Run git shell command, read output and decode it into a unicode string.
 
@@ -486,11 +507,16 @@ class GitArchiver(object):
 
         @param cwd: Working directory.
 
+        @param env: Environment variables for the process. Defaults to cls.git_env().
+
         @return: Output of the command.
 
-        @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
+        @raise CalledProcessError: Raises exception if return code of the command is non-zero.
         """
-        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd, env=cls.git_env())
+        if env is None:
+            env = cls.git_env()
+
+        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd, env=env)
         output, _ = p.communicate()
 
         if p.returncode:
@@ -524,13 +550,22 @@ class GitArchiver(object):
             return None
 
     @classmethod
-    def list_repo_files(cls, repo_abspath):
+    def get_git_local_env_vars(cls):
+        """
+        Return names of environment variables that git considers local to a repository.
+        """
+        output = cls.run_git_shell('git rev-parse --local-env-vars')
+        return [v.decode('utf-8') for v in output.splitlines()]
+
+    @classmethod
+    def list_repo_files(cls, repo_abspath, env=None):
         """
         Return a list of all files as seen by git in a given repo.
         """
         repo_file_paths = cls.run_git_shell(
             'git ls-files -z --cached --full-name --no-empty-directory',
-            cwd=repo_abspath
+            cwd=repo_abspath,
+            env=env
         )
         repo_file_paths = repo_file_paths.split(b'\0')[:-1]
 
@@ -542,7 +577,7 @@ class GitArchiver(object):
         return repo_file_paths
 
     @classmethod
-    def list_repo_submodules(cls, repo_abspath):
+    def list_repo_submodules(cls, repo_abspath, env=None):
         """
         Return a list of all direct submodules as seen by git in a given repo.
         """
@@ -551,7 +586,7 @@ class GitArchiver(object):
         else:
             shell_command = 'git submodule foreach --quiet \'printf "%s\\0" "$sm_path"\''
 
-        repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath)
+        repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath, env=env)
         repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]
 
         if sys.platform.startswith('win32'):
