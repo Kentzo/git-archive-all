@@ -372,6 +372,9 @@ ignore_dir = {
 skipif_file_darwin = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid macOS filename.')
 skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")
 
+git_version = GitArchiver.get_git_version()
+skipif_git_config_count = pytest.mark.skipif(git_version is None or git_version < (2, 31), reason="GIT_CONFIG_COUNT requires git 2.31+")
+
 
 @pytest.mark.parametrize('contents', [
     pytest.param(base, id='No Ignore'),
@@ -448,6 +451,102 @@ def test_cli(tmpdir, git_env, monkeypatch):
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
+
+    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        expected = make_expected_tree(contents)
+        actual = make_actual_tree(repo_tar)
+
+    assert actual == expected
+
+
+@pytest.mark.parametrize('env_vars', [
+    pytest.param({'GIT_DIR': '.git'}, id='GIT_DIR'),
+    pytest.param({'GIT_DIR': '.git', 'GIT_WORK_TREE': '.'}, id='GIT_DIR and GIT_WORK_TREE'),
+    pytest.param({'GIT_INDEX_FILE': '.git/index'}, id='GIT_INDEX_FILE'),
+])
+def test_submodule_local_env(env_vars, tmpdir, git_env, monkeypatch):
+    """
+    Ensure that repository-local variables of the main repository (e.g. set by git for hooks)
+    do not leak into submodules.
+    """
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    # git-archive-all must clear these variables before running git in submodules.
+    # Otherwise `git ls-files` in a submodule reads the main repository's index and
+    # returns its paths, which, joined with the submodule's path, do not exist.
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in env_vars.items():
+            # Absolute, otherwise each git command would resolve against its own cwd.
+            monkeypatch.setenv(name, os_path_join(repo_path, value))
+
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo.archive(repo_tar_path)
+
+    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        expected = make_expected_tree(contents)
+        actual = make_actual_tree(repo_tar)
+
+    assert actual == expected
+
+
+@pytest.mark.parametrize('env_var', [
+    pytest.param('GIT_CONFIG_PARAMETERS', id='GIT_CONFIG_PARAMETERS'),
+    pytest.param('GIT_CONFIG_COUNT', id='GIT_CONFIG_COUNT', marks=skipif_git_config_count),
+])
+def test_submodule_config_env(env_var, tmpdir, git_env, monkeypatch):
+    """
+    Ensure that config passed via `git -c` applies to submodules, same as in git.
+    """
+    contents = base
+
+    if env_var == 'GIT_CONFIG_PARAMETERS':
+        config_env = {'GIT_CONFIG_PARAMETERS': "'safe.directory=*'"}
+    else:
+        config_env = {
+            'GIT_CONFIG_COUNT': '1',
+            'GIT_CONFIG_KEY_0': 'safe.directory',
+            'GIT_CONFIG_VALUE_0': '*',
+        }
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+        for name, value in config_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    # Every repository is now considered to be of dubious ownership unless safe.directory reaches it.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        monkeypatch.setenv('GIT_TEST_ASSUME_DIFFERENT_OWNER', '1')
+
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo.archive(repo_tar_path)
 
     with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
         expected = make_expected_tree(contents)
