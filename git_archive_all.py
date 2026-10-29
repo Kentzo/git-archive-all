@@ -173,8 +173,8 @@ class GitArchiver(object):
         if git_version is None:
             git_version = self.get_git_version()
 
-        if git_version is not None and git_version < (1, 6, 1):
-            raise ValueError("git of version 1.6.1 and higher is required")
+        if git_version is not None and git_version < (1, 8, 5):
+            raise ValueError("git of version 1.8.5 and higher is required")
 
         self.git_version = git_version
 
@@ -443,47 +443,10 @@ class GitArchiver(object):
                 elif nuls_count % 3 == 2:
                     info += b
 
-        def read_attrs_old(process, repo_file_path):
-            """
-            Compatibility with versions 1.8.5 and below that do not recognize -z for output.
-            """
-            process.stdin.write(repo_file_path + b'\0')
-            process.stdin.flush()
-
-            # For every attribute check-attr will output: <path>: <attribute>: <info>\n
-            # where <path> is c-quoted
-
-            path, attr, info = b'', b'', b''
-            lines_count = 0
-            lines_expected = len(attrs)
-
-            while lines_count != lines_expected:
-                line = process.stdout.readline()
-
-                info_start = line.rfind(b': ')
-                if info_start == -1:
-                    raise RuntimeError("unexpected output of check-attr: {}".format(line))
-
-                attr_start = line.rfind(b': ', 0, info_start)
-                if attr_start == -1:
-                    raise RuntimeError("unexpected output of check-attr: {}".format(line))
-
-                path = line[:attr_start]
-                attr = line[attr_start + 2:info_start]  # trim leading ": "
-                info = line[info_start + 2:len(line) - 1]  # trim leading ": " and trailing \n
-                yield path, attr, info
-
-                lines_count += 1
-
         if not attrs:
             return
 
         process = make_process()
-
-        if self.git_version is None or self.git_version > (1, 8, 5):
-            reader = read_attrs
-        else:
-            reader = read_attrs_old
 
         try:
             while True:
@@ -491,7 +454,7 @@ class GitArchiver(object):
                 repo_file_path = git_fsencode(fspath(repo_file_path))
                 repo_file_attrs = {}
 
-                for path, attr, value in reader(process, repo_file_path):
+                for path, attr, value in read_attrs(process, repo_file_path):
                     attr = attr.decode('utf-8')
                     repo_file_attrs[attr] = value
 
