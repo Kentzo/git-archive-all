@@ -210,7 +210,7 @@ class GitArchiver(object):
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {0}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is {}.".format(output_format))
 
         if not dry_run:
             if output_format in self.ZIPFILE_FORMATS:
@@ -248,23 +248,23 @@ class GitArchiver(object):
                     try:
                         archive = tarfile.open(path.abspath(output_path), mode, **compress_kwargs)
                     except TypeError:
-                        raise ValueError("{0} cannot be compressed".format(output_format))
+                        raise ValueError("{} cannot be compressed".format(output_format))
                 else:
                     archive = tarfile.open(path.abspath(output_path), mode)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise ValueError("unknown format: {0}".format(output_format))
+                raise ValueError("unknown format: {}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug(fspath("{0} => {1}").format(file_path, arcname))
+                self.LOG.debug(fspath("{} => {}").format(file_path, arcname))
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info(fspath("{0} => {1}").format(file_path, arcname))
+                self.LOG.info(fspath("{} => {}").format(file_path, arcname))
 
         self.archive_all_files(archiver)
 
@@ -387,7 +387,7 @@ class GitArchiver(object):
         """
         def make_process():
             env = self.git_env(GIT_FLUSH='1')
-            cmd = 'git check-attr --stdin -z {0}'.format(' '.join(attrs))
+            cmd = 'git check-attr --stdin -z {}'.format(' '.join(attrs))
             return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
         def read_attrs(process, repo_file_path):
@@ -437,11 +437,11 @@ class GitArchiver(object):
 
                 info_start = line.rfind(b': ')
                 if info_start == -1:
-                    raise RuntimeError("unexpected output of check-attr: {0}".format(line))
+                    raise RuntimeError("unexpected output of check-attr: {}".format(line))
 
                 attr_start = line.rfind(b': ', 0, info_start)
                 if attr_start == -1:
-                    raise RuntimeError("unexpected output of check-attr: {0}".format(line))
+                    raise RuntimeError("unexpected output of check-attr: {}".format(line))
 
                 path = line[:attr_start]
                 attr = line[attr_start + 2:info_start]  # trim leading ": "
@@ -484,7 +484,7 @@ class GitArchiver(object):
             main_repo_abspath = self.run_git_shell('git rev-parse --show-toplevel', cwd=abspath).rstrip()
             return path.abspath(git_fspath(main_repo_abspath))
         except CalledProcessError as e:
-            raise ValueError("{0} is not part of a git repository ({1})".format(abspath, e.returncode))
+            raise ValueError("{} is not part of a git repository ({})".format(abspath, e.returncode))
 
     @classmethod
     def git_env(cls, **kwargs):
@@ -592,7 +592,7 @@ def main(argv=None):
     parser = OptionParser(
         usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-export-ignore]"
               " [--force-submodules] [--include EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
-        version="%prog {0}".format(__version__)
+        version="%prog {}".format(__version__)
     )
 
     parser.add_option('--prefix',
@@ -637,7 +637,7 @@ def main(argv=None):
                       help="show files to be archived without actually creating the archive")
 
     for i in range(10):
-        parser.add_option('-{0}'.format(i),
+        parser.add_option('-{}'.format(i),
                           action='store_const',
                           const=i,
                           dest='compresslevel',
@@ -679,7 +679,7 @@ def main(argv=None):
                                )
         archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
-        parser.exit(2, "{0}\n".format(e))
+        parser.exit(2, "{}\n".format(e))
 
     return 0
 
