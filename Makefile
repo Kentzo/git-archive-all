@@ -9,7 +9,7 @@ all:
 	@echo "       test"
 
 test:
-	python setup.py test
+	tox
 
 install:
 	install -d -m 0755 $(TARGET_DIR)
