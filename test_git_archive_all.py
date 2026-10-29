@@ -41,9 +41,9 @@ def os_path_join(*args):
 
 
 @pytest.fixture
-def git_env(tmpdir_factory):
+def git_env(tmpdir_factory, monkeypatch):
     """
-    Return ENV git configured for tests:
+    Configure ENV of git for tests:
 
     1. Both system and user configs are ignored
     2. Custom git user
@@ -73,7 +73,8 @@ def git_env(tmpdir_factory):
             b'.gitmodules export-ignore\n'
         ])
 
-    return e
+    for name, value in e.items():
+        monkeypatch.setenv(name, value)
 
 
 class Record:
@@ -97,6 +98,16 @@ SubmoduleRecord = partial(Record, 'submodule', excluded=False)
 class Repo:
     def __init__(self, path):
         self.path = os.path.abspath(fspath(path))
+        self.contents = None
+
+    @classmethod
+    def create(cls, path, contents):
+        r = cls(path)
+        r.init()
+        r.add_dir('.', contents)
+        r.commit('init')
+        r.contents = contents
+        return r
 
     def init(self):
         os.mkdir(self.path)
@@ -133,19 +144,24 @@ class Repo:
 
     def add_submodule(self, rel_path, contents):
         submodule_path = os_path_join(self.path, rel_path)
-        r = Repo(submodule_path)
-        r.init()
-        r.add_dir('.', contents)
-        r.commit('init')
+        Repo.create(submodule_path, contents)
         check_call(['git', 'submodule', 'add', as_posix(os.path.normpath(submodule_path))], cwd=self.path)
         return submodule_path
 
     def commit(self, message):
-        check_call(['git', 'commit', '-m', 'init'], cwd=self.path)
+        check_call(['git', 'commit', '-m', message], cwd=self.path)
 
-    def archive(self, path, exclude=True):
+    def assert_archive(self, path, exclude=True):
+        """
+        Archive the repo into tar at path and assert that it matches contents committed by create.
+        """
         a = GitArchiver(exclude=exclude, main_repo_abspath=self.path)
         a.create(path)
+
+        with TarFile(path, format=PAX_FORMAT, encoding='utf-8') as tar_file:
+            actual = make_actual_tree(tar_file)
+
+        assert actual == make_expected_tree(self.contents, exclude)
 
 
 def make_expected_tree(contents, exclude=True):
@@ -358,6 +374,31 @@ ignore_dir = {
     })
 }
 
+git_in_cwd = deepcopy(base)
+git_in_cwd['git.exe'] = FileRecord(b'')
+git_in_cwd['git.bat'] = FileRecord(b'@echo shadowed\r\n')
+git_in_cwd['lib']['git.exe'] = FileRecord(b'')
+git_in_cwd['lib']['git.bat'] = FileRecord(b'@echo shadowed\r\n')
+
+
+@pytest.fixture
+def contents():
+    """
+    Return contents of the repo fixture.
+
+    Override with @pytest.mark.parametrize('contents', [...]).
+    """
+    return base
+
+
+@pytest.fixture
+def repo(contents, tmpdir, git_env):
+    """
+    Return Repo with contents committed.
+    """
+    return Repo.create(os_path_join(tmpdir.strpath, 'repo'), contents)
+
+
 skipif_file_darwin = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid macOS filename.')
 skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")
 
@@ -395,49 +436,20 @@ skipif_git_config_count = pytest.mark.skipif(git_version is None or git_version 
     pytest.param(True, id='With export-ignore'),
     pytest.param(False, id='Without export-ignore'),
 ])
-def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
+def test_ignore(exclude, tmpdir, repo):
     """
     Ensure that GitArchiver respects export-ignore.
     """
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    repo.archive(repo_tar_path, exclude=exclude)
+    repo.assert_archive(repo_tar_path, exclude=exclude)
+
+
+def test_cli(tmpdir, repo):
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo.path, repo_tar_path])
 
     with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
-        expected = make_expected_tree(contents, exclude)
-        actual = make_actual_tree(repo_tar)
-
-    assert actual == expected
-
-
-def test_cli(tmpdir, git_env, monkeypatch):
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo_path, repo_tar_path])
-
-    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
-        expected = make_expected_tree(contents)
-        actual = make_actual_tree(repo_tar)
-
-    assert actual == expected
+        assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
 
 
 @pytest.mark.parametrize('env_vars', [
@@ -445,59 +457,31 @@ def test_cli(tmpdir, git_env, monkeypatch):
     pytest.param({'GIT_DIR': '.git', 'GIT_WORK_TREE': '.'}, id='GIT_DIR and GIT_WORK_TREE'),
     pytest.param({'GIT_INDEX_FILE': '.git/index'}, id='GIT_INDEX_FILE'),
 ])
-def test_submodule_local_env(env_vars, tmpdir, git_env, monkeypatch):
+def test_submodule_local_env(env_vars, tmpdir, repo, monkeypatch):
     """
     Ensure that repository-local variables of the main repository (e.g. set by git for hooks)
     do not leak into submodules.
     """
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     # git-archive-all must clear these variables before running git in submodules.
     # Otherwise `git ls-files` in a submodule reads the main repository's index and
     # returns its paths, which, joined with the submodule's path, do not exist.
 
     for name, value in env_vars.items():
         # Absolute, otherwise each git command would resolve against its own cwd.
-        monkeypatch.setenv(str(name), os_path_join(repo_path, value))
+        monkeypatch.setenv(str(name), os_path_join(repo.path, value))
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    repo.archive(repo_tar_path)
-
-    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
-        expected = make_expected_tree(contents)
-        actual = make_actual_tree(repo_tar)
-
-    assert actual == expected
+    repo.assert_archive(repo_tar_path)
 
 
 @pytest.mark.parametrize('env_var', [
     pytest.param('GIT_CONFIG_PARAMETERS', id='GIT_CONFIG_PARAMETERS'),
     pytest.param('GIT_CONFIG_COUNT', id='GIT_CONFIG_COUNT', marks=skipif_git_config_count),
 ])
-def test_submodule_config_env(env_var, tmpdir, git_env, monkeypatch):
+def test_submodule_config_env(env_var, tmpdir, repo, monkeypatch):
     """
     Ensure that config passed via `git -c` applies to submodules, same as in git.
     """
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     if env_var == 'GIT_CONFIG_PARAMETERS':
         config_env = {'GIT_CONFIG_PARAMETERS': "'safe.directory=*'"}
     else:
@@ -514,30 +498,13 @@ def test_submodule_config_env(env_var, tmpdir, git_env, monkeypatch):
     monkeypatch.setenv(str('GIT_TEST_ASSUME_DIFFERENT_OWNER'), str('1'))
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    repo.archive(repo_tar_path)
-
-    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
-        expected = make_expected_tree(contents)
-        actual = make_actual_tree(repo_tar)
-
-    assert actual == expected
+    repo.assert_archive(repo_tar_path)
 
 
-def test_archiver_error(tmpdir, git_env, monkeypatch):
+def test_archiver_error(repo):
     """
     Ensure that git processes are closed when archiver raises.
     """
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     class ArchiverError(Exception):
         pass
 
@@ -545,7 +512,7 @@ def test_archiver_error(tmpdir, git_env, monkeypatch):
         if arcname == os_path_join('lib', 'extra', '__init__.py'):
             raise ArchiverError()
 
-    a = GitArchiver(prefix='', main_repo_abspath=repo_path)
+    a = GitArchiver(prefix='', main_repo_abspath=repo.path)
 
     with pytest.raises(ArchiverError):
         a.archive_all_files(archiver)
@@ -553,47 +520,33 @@ def test_archiver_error(tmpdir, git_env, monkeypatch):
     assert len(a._check_attr_gens) == 0
 
 
-@pytest.mark.parametrize('output_format', ['tar', 'tgz', 'zip'])
-def test_cli_error_cleanup(output_format, tmpdir, git_env, monkeypatch):
+@pytest.mark.parametrize('output_format', [
+    'tar',
+    'tgz',
+    'zip'
+])
+def test_cli_error_cleanup(output_format, tmpdir, repo):
     """
     Ensure that incomplete archive is removed on error.
     """
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     missing_path = os_path_join(tmpdir.strpath, 'missing')
     repo_archive_path = os_path_join(tmpdir.strpath, 'repo.' + output_format)
 
     with pytest.raises(SystemExit) as e:
-        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', repo_path, repo_archive_path])
+        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', repo.path, repo_archive_path])
 
     assert not os.path.exists(repo_archive_path)
 
 
-@pytest.mark.parametrize('fail_close, fail_remove', [(False, True), (True, False), (True, True)])
-def test_error_cleanup_error(fail_close, fail_remove, tmpdir, git_env, monkeypatch, caplog):
+@pytest.mark.parametrize('fail_close, fail_remove', [
+    (False, True),
+    (True, False),
+    (True, True)
+])
+def test_error_cleanup_error(fail_close, fail_remove, tmpdir, repo, monkeypatch, caplog):
     """
     Ensure that errors during cleanup do not hide the original exception.
     """
-    contents = base
-
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     missing_path = os_path_join(tmpdir.strpath, 'missing')
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     real_close = TarFile.close
@@ -613,7 +566,7 @@ def test_error_cleanup_error(fail_close, fail_remove, tmpdir, git_env, monkeypat
 
     monkeypatch.setattr(TarFile, 'close', close)
     monkeypatch.setattr(git_archive_all, 'remove', remove)
-    a = GitArchiver(extra=[missing_path], main_repo_abspath=repo_path)
+    a = GitArchiver(extra=[missing_path], main_repo_abspath=repo.path)
 
     with pytest.raises(OSError) as e:
         a.create(repo_tar_path)
@@ -650,33 +603,18 @@ def test_git_version_parse(version, mocker):
 
 
 @pytest.mark.skipif(not sys.platform.startswith('win32'), reason="Windows only.")
-def test_git_in_cwd(tmpdir, git_env, monkeypatch):
+@pytest.mark.parametrize('contents', [
+    pytest.param(git_in_cwd, id='git in cwd')
+])
+def test_git_in_cwd(tmpdir, repo, monkeypatch):
     """
     Ensure that git committed into the repository does not shadow git in PATH.
     """
-    for name, value in git_env.items():
-        monkeypatch.setenv(name, value)
-
-    contents = deepcopy(base)
-
-    for c in (contents, contents['lib']):
-        c['git.exe'] = FileRecord(b'')
-        c['git.bat'] = FileRecord(b'@echo shadowed\r\n')
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
-
     # Both the current directory of the process and the working directory of commands are searched by cmd.exe.
-    monkeypatch.chdir(repo_path)
+    monkeypatch.chdir(repo.path)
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    repo.archive(repo_tar_path)
-
-    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
-        assert make_actual_tree(repo_tar) == make_expected_tree(contents)
+    repo.assert_archive(repo_tar_path)
 
 
 def test_pycodestyle():
