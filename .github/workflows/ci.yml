@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: ubuntu-latest ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
+                 'pypy2.7', 'pypy3.12', '3', 'pypy3']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install pyenv
+        run: |
+          # pyenv v2.8.14
+          git init -q "$HOME/.cache/ci-pyenv"
+          git -C "$HOME/.cache/ci-pyenv" fetch -q --depth 1 https://github.com/pyenv/pyenv.git 3fb25668b463ad38ac2db6092dbf476ef744c0ca
+          git -C "$HOME/.cache/ci-pyenv" checkout -q FETCH_HEAD
+          echo "PYENV_ROOT=$HOME/.cache/ci-pyenv" >> "$GITHUB_ENV"
+          echo "$HOME/.cache/ci-pyenv/bin" >> "$GITHUB_PATH"
+
+      - name: Resolve version
+        id: resolve
+        run: |
+          version=$(pyenv latest -k "${{ matrix.python }}")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "python=$PYENV_ROOT/versions/$version/bin/python" >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        id: cache
+        with:
+          path: |
+            ~/.cache/ci-pyenv/versions
+            ~/.cache/ci-openssl
+          key: pyenv-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-${{ hashFiles('.github/scripts/install.sh') }}
+
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl libbz2-dev libffi-dev liblzma-dev libncursesw5-dev \
+            libreadline-dev libsqlite3-dev libssl-dev libxml2-dev libxmlsec1-dev tk-dev xz-utils zlib1g-dev
+
+      - name: Install Python ${{ steps.resolve.outputs.version }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: .github/scripts/install.sh "${{ steps.resolve.outputs.version }}"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-${{ hashFiles('.github/scripts/ci-requirements.txt', 'test-requirements.txt') }}
+          # Allow reuse of pip cache across changes in requirements.
+          restore-keys: pip-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-
+
+      - name: Install tox
+        run: |
+          "${{ steps.resolve.outputs.python }}" -m pip install -r .github/scripts/ci-requirements.txt
+
+      - uses: actions/cache@v6
+        with:
+          path: .tox
+          key: tox-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-${{ hashFiles('setup.cfg', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
+
+      - name: Test
+        run: |
+          "${{ steps.resolve.outputs.python }}" -m tox -vv -e py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.python }}
+          path: .coverage
+          include-hidden-files: true
+          if-no-files-found: error
+
+  coverage:
+    needs: linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: .github/scripts/coverage-requirements.txt
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          path: coverage
+
+      - name: Combine coverage
+        run: |
+          python -m pip install -r .github/scripts/coverage-requirements.txt
+          python -m coverage combine coverage/*/.coverage
+          python -m coverage xml
+          python -m coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          disable_search: true
+          use_oidc: true
+
+  win-darwin:
+    name: ${{ matrix.os }} ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-26-intel, macos-latest]
+        python: ['3.5', '3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
+                 'pypy2.7', 'pypy3.12']
+        exclude:
+          # git-archive-all does not support Python 2 on Windows.
+          - {os: windows-latest, python: 'pypy2.7'}
+          # CPython supports arm64 macOS since 3.8.10 and 3.9.1.
+          - {os: macos-latest, python: '3.5'}
+          - {os: macos-latest, python: '3.6'}
+          - {os: macos-latest, python: '3.7'}
+          # setup-python's builds load OpenSSL 1.1 from Homebrew's openssl@1.1, which Homebrew no longer provides.
+          - {os: macos-26-intel, python: '3.5'}
+          - {os: macos-26-intel, python: '3.6'}
+          - {os: macos-26-intel, python: '3.7'}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        id: python
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            .github/scripts/ci-requirements.txt
+            test-requirements.txt
+
+      - name: Install tox
+        run: python -m pip install -r .github/scripts/ci-requirements.txt
+
+      - uses: actions/cache@v6
+        with:
+          path: .tox
+          key: tox-${{ matrix.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{ hashFiles('setup.cfg', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
+
+      - name: Test
+        run: python -m tox -vv -e py
