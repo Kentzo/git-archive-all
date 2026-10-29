@@ -1,0 +1,3 @@
+tox-venv==0.4.0; python_version < "3.11"
+tox==3.20.1; python_version < "3.11"
+tox==4.67.4; python_version >= "3.11"
