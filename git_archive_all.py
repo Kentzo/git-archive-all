@@ -91,10 +91,10 @@ try:
         return decoder(_fspath(filename))
 except ImportError:
     def fspath(filename, decoder=fsdecode, encoder=fsencode):
-        # Python 3.4 and 3.5: str can represent any path (PEP 383),
+        # Python 3.5: str can represent any path (PEP 383),
         #   but str is required on Windows (no PEP 529)
         #
-        # Python 2.6 and 2.7: str cannot represent any path (no PEP 383),
+        # Python 2.7: str cannot represent any path (no PEP 383),
         #   str is required on Windows (no PEP 529)
         #   bytes is required on POSIX (no PEP 383)
         if sys.version_info > (3,):
@@ -494,10 +494,7 @@ class GitArchiver(object):
         output, _ = p.communicate()
 
         if p.returncode:
-            if sys.version_info > (2, 6):
-                raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
-            else:
-                raise CalledProcessError(returncode=p.returncode, cmd=cmd)
+            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
 
         return output
 
