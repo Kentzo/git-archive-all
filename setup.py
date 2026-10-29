@@ -15,6 +15,7 @@ else:
 setup(
     version=verstr,
     py_modules=['git_archive_all'],
-    package_data={'git_archive_all': ['py.typed', '*.pyi']},
+    packages=['git_archive_all-stubs'],
+    package_data={'git_archive_all-stubs': ['__init__.pyi']},
     entry_points={'console_scripts': 'git-archive-all=git_archive_all:main'},
 )
