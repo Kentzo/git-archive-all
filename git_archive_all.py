@@ -132,9 +132,11 @@ class GitArchiver(object):
         'tbz2': 'w:bz2',
         'tgz': 'w:gz',
         'txz': 'w:xz',
+        'tzst': 'w:zst',
         'bz2': 'w:bz2',
         'gz': 'w:gz',
-        'xz': 'w:xz'
+        'xz': 'w:xz',
+        'zst': 'w:zst'
     }
     ZIPFILE_FORMATS = ('zip',)
 
@@ -192,7 +194,7 @@ class GitArchiver(object):
         Create the archive at output_file_path.
 
         Type of the archive is determined either by extension of output_file_path or by output_format.
-        Supported formats are: gz, zip, bz2, xz, tar, tgz, txz
+        Supported formats are: tar, bz2, gz, xz, zip, zst, tbz2, tgz, txz, tzst (subject to Python version).
 
         @param output_path: Output file path.
 
@@ -236,8 +238,15 @@ class GitArchiver(object):
                 mode = self.TARFILE_FORMATS[output_format]
 
                 if compresslevel is not None:
+                    if mode == 'w:xz':
+                        compress_kwargs = {'preset': compresslevel}
+                    elif mode == 'w:zst':
+                        compress_kwargs = {'level': compresslevel}
+                    else:
+                        compress_kwargs = {'compresslevel': compresslevel}
+
                     try:
-                        archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
+                        archive = tarfile.open(path.abspath(output_path), mode, **compress_kwargs)
                     except TypeError:
                         raise ValueError("{0} cannot be compressed".format(output_format))
                 else:
@@ -650,7 +659,8 @@ def main(argv=None):
     else:
         output_name = path.basename(output_file_path)
         output_name = re.sub(
-            '(\\.zip|\\.tar|\\.tbz2|\\.tgz|\\.txz|\\.bz2|\\.gz|\\.xz|\\.tar\\.bz2|\\.tar\\.gz|\\.tar\\.xz)$',
+            '(\\.zip|\\.tar|\\.tbz2|\\.tgz|\\.txz|\\.tzst|\\.bz2|\\.gz|\\.xz|\\.zst'
+            '|\\.tar\\.bz2|\\.tar\\.gz|\\.tar\\.xz|\\.tar\\.zst)$',
             '',
             output_name
         ) or "Archive"
