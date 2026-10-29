@@ -10,7 +10,6 @@ import os
 from subprocess import check_call
 import sys
 from tarfile import TarFile, PAX_FORMAT
-import warnings
 
 import pycodestyle
 import pytest
@@ -51,8 +50,8 @@ def git_env(tmpdir_factory):
     3. .gitmodules file is ignored by default
     """
     e = {
-        'GIT_CONFIG_NOSYSTEM': 'true',
-        'HOME': tmpdir_factory.getbasetemp().strpath
+        str('GIT_CONFIG_NOSYSTEM'): str('true'),
+        str('HOME'): tmpdir_factory.getbasetemp().strpath
     }
 
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('wb+') as f:
@@ -400,12 +399,8 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
     """
     Ensure that GitArchiver respects export-ignore.
     """
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -426,12 +421,8 @@ def test_ignore(contents, exclude, tmpdir, git_env, monkeypatch):
 def test_cli(tmpdir, git_env, monkeypatch):
     contents = base
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -461,12 +452,8 @@ def test_submodule_local_env(env_vars, tmpdir, git_env, monkeypatch):
     """
     contents = base
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -478,12 +465,9 @@ def test_submodule_local_env(env_vars, tmpdir, git_env, monkeypatch):
     # Otherwise `git ls-files` in a submodule reads the main repository's index and
     # returns its paths, which, joined with the submodule's path, do not exist.
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in env_vars.items():
-            # Absolute, otherwise each git command would resolve against its own cwd.
-            monkeypatch.setenv(name, os_path_join(repo_path, value))
+    for name, value in env_vars.items():
+        # Absolute, otherwise each git command would resolve against its own cwd.
+        monkeypatch.setenv(str(name), os_path_join(repo_path, value))
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.archive(repo_tar_path)
@@ -505,6 +489,15 @@ def test_submodule_config_env(env_var, tmpdir, git_env, monkeypatch):
     """
     contents = base
 
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
     if env_var == 'GIT_CONFIG_PARAMETERS':
         config_env = {'GIT_CONFIG_PARAMETERS': "'safe.directory=*'"}
     else:
@@ -514,26 +507,11 @@ def test_submodule_config_env(env_var, tmpdir, git_env, monkeypatch):
             'GIT_CONFIG_VALUE_0': '*',
         }
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
-
-        for name, value in config_env.items():
-            monkeypatch.setenv(name, value)
-
-    repo_path = os_path_join(tmpdir.strpath, 'repo')
-    repo = Repo(repo_path)
-    repo.init()
-    repo.add_dir('.', contents)
-    repo.commit('init')
+    for name, value in config_env.items():
+        monkeypatch.setenv(str(name), str(value))
 
     # Every repository is now considered to be of dubious ownership unless safe.directory reaches it.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        monkeypatch.setenv('GIT_TEST_ASSUME_DIFFERENT_OWNER', '1')
+    monkeypatch.setenv(str('GIT_TEST_ASSUME_DIFFERENT_OWNER'), str('1'))
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.archive(repo_tar_path)
@@ -551,12 +529,8 @@ def test_archiver_error(tmpdir, git_env, monkeypatch):
     """
     contents = base
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -586,12 +560,8 @@ def test_cli_error_cleanup(output_format, tmpdir, git_env, monkeypatch):
     """
     contents = base
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -615,12 +585,8 @@ def test_error_cleanup_error(fail_close, fail_remove, tmpdir, git_env, monkeypat
     """
     contents = base
 
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     repo_path = os_path_join(tmpdir.strpath, 'repo')
     repo = Repo(repo_path)
@@ -688,12 +654,8 @@ def test_git_in_cwd(tmpdir, git_env, monkeypatch):
     """
     Ensure that git committed into the repository does not shadow git in PATH.
     """
-    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-
-        for name, value in git_env.items():
-            monkeypatch.setenv(name, value)
+    for name, value in git_env.items():
+        monkeypatch.setenv(name, value)
 
     contents = deepcopy(base)
 
