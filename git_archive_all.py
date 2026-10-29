@@ -377,7 +377,7 @@ class GitArchiver(object):
         @param attrs: Attributes to check
         """
         def make_process():
-            env = dict(environ, GIT_FLUSH='1')
+            env = self.git_env(GIT_FLUSH='1')
             cmd = 'git check-attr --stdin -z {0}'.format(' '.join(attrs))
             return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
 
@@ -478,6 +478,18 @@ class GitArchiver(object):
             raise ValueError("{0} is not part of a git repository ({1})".format(abspath, e.returncode))
 
     @classmethod
+    def git_env(cls, **kwargs):
+        """
+        Return environment for git shell commands.
+        """
+        env = dict(environ, **kwargs)
+
+        if sys.platform.startswith('win32') and 'NoDefaultCurrentDirectoryInExePath' not in environ:
+            env['NoDefaultCurrentDirectoryInExePath'] = '1'
+
+        return env
+
+    @classmethod
     def run_git_shell(cls, cmd, cwd=None):
         """
         Run git shell command, read output and decode it into a unicode string.
@@ -490,7 +502,7 @@ class GitArchiver(object):
 
         @raise CalledProcessError:  Raises exception if return code of the command is non-zero.
         """
-        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd)
+        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd, env=cls.git_env())
         output, _ = p.communicate()
 
         if p.returncode:
@@ -547,12 +559,9 @@ class GitArchiver(object):
         Return a list of all direct submodules as seen by git in a given repo.
         """
         if sys.platform.startswith('win32'):
-            shell_command = 'git submodule foreach --quiet "\\"{0}\\" -c \\"from __future__ import print_function; print(\'"$sm_path"\', end=chr(0))\\""'
+            shell_command = 'git submodule foreach --quiet "printf \'%s\\0\' \\"$sm_path\\""'
         else:
-            shell_command = 'git submodule foreach --quiet \'"{0}" -c "from __future__ import print_function; print(\\"$sm_path\\", end=chr(0))"\''
-
-        python_exe = sys.executable or 'python'
-        shell_command = shell_command.format(python_exe)
+            shell_command = 'git submodule foreach --quiet \'printf "%s\\0" "$sm_path"\''
 
         repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath)
         repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]

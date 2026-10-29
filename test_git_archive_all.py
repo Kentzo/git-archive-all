@@ -338,6 +338,16 @@ non_unicode_backslash_quoted['data'] = DirRecord({
     b'\"\\\xc2.dat\"': FileRecord(b'Although practicality beats purity.')
 })
 
+single_quote_submodule = deepcopy(base)
+single_quote_submodule['\'lib\''] = SubmoduleRecord({
+    '__init__.py': FileRecord(b'#If the implementation is hard to explain, it\'s a bad idea.'),
+})
+
+double_quote_submodule = deepcopy(base)
+double_quote_submodule['\"lib\"'] = SubmoduleRecord({
+    '__init__.py': FileRecord(b'#If the implementation is easy to explain, it may be a good idea.'),
+})
+
 ignore_dir = {
     '.gitattributes': FileRecord(b'.gitattributes export-ignore\n**/src export-ignore\ndata/src/__main__.py -export-ignore', excluded=True),
     '__init__.py': FileRecord(b'#Beautiful is better than ugly.'),
@@ -375,6 +385,8 @@ skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason=
     pytest.param(backslash_quoted, id='Backslash (Quoted)', marks=skipif_file_win32),
     pytest.param(non_unicode_backslash_base, id='Non-Unicode Backslash', marks=[skipif_file_win32, skipif_file_darwin]),
     pytest.param(non_unicode_backslash_quoted, id='Non-Unicode Backslash (Quoted)', marks=[skipif_file_win32, skipif_file_darwin]),
+    pytest.param(single_quote_submodule, id='Submodule (Single Quote)'),
+    pytest.param(double_quote_submodule, id='Submodule (Double Quote)', marks=skipif_file_win32),
     pytest.param(ignore_dir, id='Ignore Directory')
 ])
 @pytest.mark.parametrize('exclude', [
@@ -441,6 +453,40 @@ def test_cli(tmpdir, git_env, monkeypatch):
 def test_git_version_parse(version, mocker):
     mocker.patch.object(GitArchiver, 'run_git_shell', return_value=version)
     assert GitArchiver.get_git_version() == (2, 21, 0, 0, 1)
+
+
+@pytest.mark.skipif(not sys.platform.startswith('win32'), reason="Windows only.")
+def test_git_in_cwd(tmpdir, git_env, monkeypatch):
+    """
+    Ensure that git committed into the repository does not shadow git in PATH.
+    """
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    contents = deepcopy(base)
+
+    for c in (contents, contents['lib']):
+        c['git.exe'] = FileRecord(b'')
+        c['git.bat'] = FileRecord(b'@echo shadowed\r\n')
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    # Both the current directory of the process and the working directory of commands are searched by cmd.exe.
+    monkeypatch.chdir(repo_path)
+
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo.archive(repo_tar_path)
+
+    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+        assert make_actual_tree(repo_tar) == make_expected_tree(contents)
 
 
 def test_pycodestyle():

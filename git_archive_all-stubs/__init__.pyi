@@ -58,6 +58,9 @@ class GitArchiver(object):
     def resolve_git_main_repo_abspath(self, abspath: PathLike) -> PathStr: ...
 
     @classmethod
+    def git_env(cls, **kwargs: str) -> Dict[str, str]: ...
+
+    @classmethod
     def run_git_shell(cls, cmd: str, cwd: PathStr = None) -> bytes: ...
 
     @classmethod
