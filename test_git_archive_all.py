@@ -480,6 +480,101 @@ def test_archiver_error(tmpdir, git_env, monkeypatch):
     assert len(a._check_attr_gens) == 0
 
 
+@pytest.mark.parametrize('output_format', ['tar', 'tgz', 'zip'])
+def test_cli_error_cleanup(output_format, tmpdir, git_env, monkeypatch):
+    """
+    Ensure that incomplete archive is removed on error.
+    """
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    missing_path = os_path_join(tmpdir.strpath, 'missing')
+    repo_archive_path = os_path_join(tmpdir.strpath, 'repo.' + output_format)
+
+    with pytest.raises(SystemExit) as e:
+        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', repo_path, repo_archive_path])
+
+    assert not os.path.exists(repo_archive_path)
+
+
+@pytest.mark.parametrize('fail_close, fail_remove', [(False, True), (True, False), (True, True)])
+def test_error_cleanup_error(fail_close, fail_remove, tmpdir, git_env, monkeypatch, caplog):
+    """
+    Ensure that errors during cleanup do not hide the original exception.
+    """
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    missing_path = os_path_join(tmpdir.strpath, 'missing')
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    real_close = TarFile.close
+    real_remove = git_archive_all.remove
+
+    def close(self):
+        real_close(self)
+
+        if fail_close:
+            raise OSError(errno.EIO, '')
+
+    def remove(p):
+        if fail_remove:
+            raise OSError(errno.EACCES, '')
+
+        real_remove(p)
+
+    monkeypatch.setattr(TarFile, 'close', close)
+    monkeypatch.setattr(git_archive_all, 'remove', remove)
+    a = GitArchiver(extra=[missing_path], main_repo_abspath=repo_path)
+
+    with pytest.raises(OSError) as e:
+        a.create(repo_tar_path)
+
+    expected = []
+    if fail_remove:
+        expected += [errno.EACCES]
+    if fail_close:
+        expected += [errno.EIO]
+    expected += [errno.ENOENT]
+
+    if sys.version_info >= (3,):
+        actual = []
+        context = e.value
+
+        while context is not None:
+            actual.append(context.errno)
+            context = context.__context__
+
+        assert actual == expected
+    else:
+        assert e.value.errno == errno.ENOENT
+
+    assert os.path.exists(repo_tar_path) == fail_remove
+
+
 @pytest.mark.parametrize('version', [
     b'git version 2.21.0.0.1',
     b'git version 2.21.0.windows.1'
