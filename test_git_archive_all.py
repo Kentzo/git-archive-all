@@ -456,6 +456,40 @@ def test_cli(tmpdir, git_env, monkeypatch):
     assert actual == expected
 
 
+def test_archiver_error(tmpdir, git_env, monkeypatch):
+    """
+    Ensure that git processes are closed when archiver raises.
+    """
+    contents = base
+
+    # On Python 2.7 contained code raises pytest.PytestWarning warning for no good reason.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+
+        for name, value in git_env.items():
+            monkeypatch.setenv(name, value)
+
+    repo_path = os_path_join(tmpdir.strpath, 'repo')
+    repo = Repo(repo_path)
+    repo.init()
+    repo.add_dir('.', contents)
+    repo.commit('init')
+
+    class ArchiverError(Exception):
+        pass
+
+    def archiver(file_path, arcname):
+        if arcname == os_path_join('lib', 'extra', '__init__.py'):
+            raise ArchiverError()
+
+    a = GitArchiver(prefix='', main_repo_abspath=repo_path)
+
+    with pytest.raises(ArchiverError):
+        a.archive_all_files(archiver)
+
+    assert len(a._check_attr_gens) == 0
+
+
 @pytest.mark.parametrize('version', [
     b'git version 2.21.0.0.1',
     b'git version 2.21.0.windows.1'

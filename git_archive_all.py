@@ -26,6 +26,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from contextlib import closing
 import logging
 from os import environ, extsep, path, readlink
 from subprocess import CalledProcessError, Popen, PIPE
@@ -316,8 +317,9 @@ class GitArchiver(object):
         for file_path in self.extra:
             archiver(path.abspath(file_path), path.join(self.prefix, file_path))
 
-        for file_path in self.walk_git_files():
-            archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
+        with closing(self.walk_git_files()) as git_files:
+            for file_path in git_files:
+                archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
 
     def walk_git_files(self, repo_path=fspath('')):
         """
@@ -361,13 +363,14 @@ class GitArchiver(object):
 
                 main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
 
-                for main_repo_submodule_file_path in self.walk_git_files(main_repo_submodule_path):
-                    repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
+                with closing(self.walk_git_files(main_repo_submodule_path)) as git_files:
+                    for main_repo_submodule_file_path in git_files:
+                        repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
 
-                    if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
-                        continue
+                        if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
+                            continue
 
-                    yield main_repo_submodule_file_path
+                        yield main_repo_submodule_file_path
         finally:
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
