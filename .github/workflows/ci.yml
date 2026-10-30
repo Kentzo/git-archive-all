@@ -74,7 +74,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .tox
-          key: tox-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-${{ hashFiles('setup.cfg', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
+          key: tox-${{ steps.resolve.outputs.image }}-${{ runner.arch }}-${{ steps.resolve.outputs.version }}-${{ hashFiles('pyproject.toml', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
 
       - name: Test
         run: |
@@ -122,7 +122,7 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .tox
-          key: tox-${{ matrix.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{ hashFiles('setup.cfg', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
+          key: tox-${{ matrix.os }}-${{ runner.arch }}-${{ steps.python.outputs.python-version }}-${{ hashFiles('pyproject.toml', 'test-requirements.txt', '.github/scripts/ci-requirements.txt') }}
 
       - name: Test
         run: python -m tox -vv -e py
