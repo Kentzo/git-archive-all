@@ -189,14 +189,14 @@ class GitArchiver:
                     try:
                         archive = tarfile.open(path.abspath(output_path), mode, compresslevel=compresslevel)
                     except TypeError:
-                        raise ValueError("{} cannot be compressed".format(output_format))
+                        raise ValueError(f"{output_format} cannot be compressed")
                 else:
                     archive = tarfile.open(path.abspath(output_path), mode)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)
             else:
-                raise ValueError("unknown format: {}".format(output_format))
+                raise ValueError(f"unknown format: {output_format}")
 
             def archiver(file_path, arcname):
                 self.LOG.debug("%s => %s", file_path, arcname)
@@ -403,7 +403,7 @@ class GitArchiver:
             main_repo_abspath = self.run_git_shell('git rev-parse --show-toplevel', cwd=abspath).rstrip()
             return path.abspath(git_fsdecode(main_repo_abspath))
         except CalledProcessError as e:
-            raise ValueError("{} is not part of a git repository ({})".format(abspath, e.returncode))
+            raise ValueError(f"{abspath} is not part of a git repository ({e.returncode})")
 
     @classmethod
     def git_env(cls):
@@ -519,7 +519,7 @@ def main(argv=None):
     parser = OptionParser(
         usage="usage: %prog [-v] [-C BASE_REPO] [--prefix PREFIX] [--no-export-ignore]"
               " [--force-submodules] [--include EXTRA1 ...] [--dry-run] [-0 | ... | -9] OUTPUT_FILE",
-        version="%prog {}".format(__version__)
+        version=f"%prog {__version__}"
     )
 
     parser.add_option('--prefix',
@@ -564,7 +564,7 @@ def main(argv=None):
                       help="show files to be archived without actually creating the archive")
 
     for i in range(10):
-        parser.add_option('-{}'.format(i),
+        parser.add_option(f'-{i}',
                           action='store_const',
                           const=i,
                           dest='compresslevel',
@@ -605,7 +605,7 @@ def main(argv=None):
                                )
         archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
-        parser.exit(2, "{}\n".format(e))
+        parser.exit(2, f"{e}\n")
 
     return 0
 
