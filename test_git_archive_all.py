@@ -2,6 +2,7 @@ from copy import deepcopy
 import errno
 from functools import partial
 import os
+from pathlib import Path, PurePosixPath
 from subprocess import check_call
 import sys
 from tarfile import TarFile, PAX_FORMAT
@@ -23,22 +24,8 @@ import git_archive_all
 from git_archive_all import GitArchiver, fspath
 
 
-def as_posix(p):
-    if sys.platform == 'win32':
-        return p.replace(b'\\', b'/') if isinstance(p, bytes) else p.replace('\\', '/')
-    else:
-        return p
-
-
-def os_path_join(*args):
-    """
-    Ensure that all path components are uniformly encoded.
-    """
-    return os.path.join(*(fspath(p) for p in args))
-
-
 @pytest.fixture
-def git_env(tmpdir_factory, monkeypatch):
+def git_env(tmp_path_factory, monkeypatch):
     """
     Configure ENV of git for tests:
 
@@ -46,12 +33,13 @@ def git_env(tmpdir_factory, monkeypatch):
     2. Custom git user
     3. .gitmodules file is ignored by default
     """
+    home_path = tmp_path_factory.getbasetemp()
     e = {
         'GIT_CONFIG_NOSYSTEM': 'true',
-        'HOME': tmpdir_factory.getbasetemp().strpath
+        'HOME': fspath(home_path)
     }
 
-    with tmpdir_factory.getbasetemp().join('.gitconfig').open('wb+') as f:
+    with (home_path / '.gitconfig').open('wb+') as f:
         f.writelines([
             b'[core]\n',
             f"attributesfile = {(home_path / '.gitattributes').as_posix()}\n".encode(),
@@ -65,7 +53,7 @@ def git_env(tmpdir_factory, monkeypatch):
     #
     # If test is run with the --no-exclude CLI option (or its exclude=False API equivalent)
     # then the file itself is included while its content is discarded for the same reason.
-    with tmpdir_factory.getbasetemp().join('.gitattributes').open('wb+') as f:
+    with (home_path / '.gitattributes').open('wb+') as f:
         f.writelines([
             b'.gitmodules export-ignore\n'
         ])
@@ -94,7 +82,7 @@ SubmoduleRecord = partial(Record, 'submodule', excluded=False)
 
 class Repo:
     def __init__(self, path):
-        self.path = os.path.abspath(fspath(path))
+        self.path = Path(path).resolve()
         self.contents = None
 
     @classmethod
@@ -121,28 +109,28 @@ class Repo:
             raise ValueError
 
     def add_file(self, rel_path, contents):
-        file_path = os_path_join(self.path, rel_path)
+        file_path = self.path / rel_path
 
-        with open(file_path, 'wb') as f:
+        with file_path.open('wb') as f:
             f.write(contents)
 
-        check_call(['git', 'add', as_posix(os.path.normpath(file_path))], cwd=self.path)
+        check_call(['git', 'add', file_path.as_posix()], cwd=self.path)
         return file_path
 
     def add_dir(self, rel_path, contents):
-        dir_path = os_path_join(self.path, rel_path)
-        os.makedirs(dir_path, exist_ok=True)
+        dir_path = self.path / rel_path
+        dir_path.mkdir(parents=True, exist_ok=True)
 
         for k, v in contents.items():
-            self.add(as_posix(os.path.normpath(os_path_join(dir_path, k))), v)
+            self.add(dir_path / fspath(k), v)
 
-        check_call(['git', 'add', dir_path], cwd=self.path)
+        check_call(['git', 'add', dir_path.as_posix()], cwd=self.path)
         return dir_path
 
     def add_submodule(self, rel_path, contents):
-        submodule_path = os_path_join(self.path, rel_path)
+        submodule_path = self.path / rel_path
         Repo.create(submodule_path, contents)
-        check_call(['git', 'submodule', 'add', as_posix(os.path.normpath(submodule_path))], cwd=self.path)
+        check_call(['git', 'submodule', 'add', submodule_path.as_posix()], cwd=self.path)
         return submodule_path
 
     def commit(self, message):
@@ -173,7 +161,7 @@ def make_expected_tree(contents, exclude=True):
                 e['.gitmodules'] = None
 
             for nested_k, nested_v in make_expected_tree(v.contents, exclude).items():
-                nested_k = as_posix(os_path_join(k, nested_k))
+                nested_k = (PurePosixPath(fspath(k)) / fspath(nested_k)).as_posix()
                 e[nested_k] = nested_v
 
     return e
@@ -184,10 +172,10 @@ def make_actual_tree(tar_file):
 
     for m in tar_file.getmembers():
         if m.isfile():
-            name = fspath(m.name)
+            name = m.name
 
             # See the comment in git_env.
-            if not name.endswith(fspath('.gitmodules')):
+            if not name.endswith('.gitmodules'):
                 a[name] = tar_file.extractfile(m).read()
             else:
                 a[name] = None
@@ -389,11 +377,11 @@ def contents():
 
 
 @pytest.fixture
-def repo(contents, tmpdir, git_env):
+def repo(contents, tmp_path, git_env):
     """
     Return Repo with contents committed.
     """
-    return Repo.create(os_path_join(tmpdir.strpath, 'repo'), contents)
+    return Repo.create(tmp_path / 'repo', contents)
 
 
 skipif_file_darwin = pytest.mark.skipif(sys.platform == 'darwin', reason='Invalid macOS filename.')
@@ -433,17 +421,17 @@ skipif_git_config_count = pytest.mark.skipif(git_version is None or git_version 
     pytest.param(True, id='With export-ignore'),
     pytest.param(False, id='Without export-ignore'),
 ])
-def test_ignore(exclude, tmpdir, repo):
+def test_ignore(exclude, tmp_path, repo):
     """
     Ensure that GitArchiver respects export-ignore.
     """
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo_tar_path = tmp_path / 'repo.tar'
     repo.assert_archive(repo_tar_path, exclude=exclude)
 
 
-def test_cli(tmpdir, repo):
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
-    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', repo.path, repo_tar_path])
+def test_cli(tmp_path, repo):
+    repo_tar_path = fspath(tmp_path / 'repo.tar')
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fspath(repo.path), repo_tar_path])
 
     with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
@@ -456,13 +444,13 @@ def test_cli(tmpdir, repo):
     '-v',
     '--dry-run'
 ])
-def test_cli_log(option, tmpdir, repo, capfd):
+def test_cli_log(option, tmp_path, repo, capfd):
     """
     Ensure that CLI logs non-ASCII paths.
     """
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo_tar_path = fspath(tmp_path / 'repo.tar')
     capfd.readouterr()
-    git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', repo.path, repo_tar_path])
+    git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', fspath(repo.path), repo_tar_path])
     out, _ = capfd.readouterr()
 
     assert f" => {os.path.join('data', 'مرحبا بالعالم.dat')}\n" in out
@@ -473,7 +461,7 @@ def test_cli_log(option, tmpdir, repo, capfd):
     pytest.param({'GIT_DIR': '.git', 'GIT_WORK_TREE': '.'}, id='GIT_DIR and GIT_WORK_TREE'),
     pytest.param({'GIT_INDEX_FILE': '.git/index'}, id='GIT_INDEX_FILE'),
 ])
-def test_submodule_local_env(env_vars, tmpdir, repo, monkeypatch):
+def test_submodule_local_env(env_vars, tmp_path, repo, monkeypatch):
     """
     Ensure that repository-local variables of the main repository (e.g. set by git for hooks)
     do not leak into submodules.
@@ -484,9 +472,9 @@ def test_submodule_local_env(env_vars, tmpdir, repo, monkeypatch):
 
     for name, value in env_vars.items():
         # Absolute, otherwise each git command would resolve against its own cwd.
-        monkeypatch.setenv(name, os_path_join(repo.path, value))
+        monkeypatch.setenv(name, fspath(repo.path / value))
 
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo_tar_path = tmp_path / 'repo.tar'
     repo.assert_archive(repo_tar_path)
 
 
@@ -494,7 +482,7 @@ def test_submodule_local_env(env_vars, tmpdir, repo, monkeypatch):
     pytest.param('GIT_CONFIG_PARAMETERS', id='GIT_CONFIG_PARAMETERS'),
     pytest.param('GIT_CONFIG_COUNT', id='GIT_CONFIG_COUNT', marks=skipif_git_config_count),
 ])
-def test_submodule_config_env(env_var, tmpdir, repo, monkeypatch):
+def test_submodule_config_env(env_var, tmp_path, repo, monkeypatch):
     """
     Ensure that config passed via `git -c` applies to submodules, same as in git.
     """
@@ -513,7 +501,7 @@ def test_submodule_config_env(env_var, tmpdir, repo, monkeypatch):
     # Every repository is now considered to be of dubious ownership unless safe.directory reaches it.
     monkeypatch.setenv('GIT_TEST_ASSUME_DIFFERENT_OWNER', '1')
 
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo_tar_path = tmp_path / 'repo.tar'
     repo.assert_archive(repo_tar_path)
 
 
@@ -525,7 +513,7 @@ def test_archiver_error(repo):
         pass
 
     def archiver(file_path, arcname):
-        if arcname == os_path_join('lib', 'extra', '__init__.py'):
+        if Path(arcname) == Path('lib', 'extra', '__init__.py'):
             raise ArchiverError()
 
     a = GitArchiver(prefix='', main_repo_abspath=repo.path)
@@ -541,15 +529,15 @@ def test_archiver_error(repo):
     'tgz',
     'zip'
 ])
-def test_cli_error_cleanup(output_format, tmpdir, repo):
+def test_cli_error_cleanup(output_format, tmp_path, repo):
     """
     Ensure that incomplete archive is removed on error.
     """
-    missing_path = os_path_join(tmpdir.strpath, 'missing')
-    repo_archive_path = os_path_join(tmpdir.strpath, 'repo.' + output_format)
+    missing_path = fspath(tmp_path / 'missing')
+    repo_archive_path = fspath(tmp_path / f'repo.{output_format}')
 
-    with pytest.raises(SystemExit) as e:
-        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', repo.path, repo_archive_path])
+    with pytest.raises(SystemExit):
+        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', fspath(repo.path), repo_archive_path])
 
     assert not os.path.exists(repo_archive_path)
 
@@ -559,12 +547,12 @@ def test_cli_error_cleanup(output_format, tmpdir, repo):
     (True, False),
     (True, True)
 ])
-def test_error_cleanup_error(fail_close, fail_remove, tmpdir, repo, monkeypatch):
+def test_error_cleanup_error(fail_close, fail_remove, tmp_path, repo, monkeypatch):
     """
     Ensure that errors during cleanup do not hide the original exception.
     """
-    missing_path = os_path_join(tmpdir.strpath, 'missing')
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    missing_path = tmp_path / 'missing'
+    repo_tar_path = tmp_path / 'repo.tar'
     real_close = TarFile.close
     real_remove = git_archive_all.remove
 
@@ -619,14 +607,14 @@ def test_git_version_parse(version, mocker):
 @pytest.mark.parametrize('contents', [
     pytest.param(git_in_cwd, id='git in cwd')
 ])
-def test_git_in_cwd(tmpdir, repo, monkeypatch):
+def test_git_in_cwd(tmp_path, repo, monkeypatch):
     """
     Ensure that git committed into the repository does not shadow git in PATH.
     """
     # Both the current directory of the process and the working directory of commands are searched by cmd.exe.
     monkeypatch.chdir(repo.path)
 
-    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    repo_tar_path = tmp_path / 'repo.tar'
     repo.assert_archive(repo_tar_path)
 
 
