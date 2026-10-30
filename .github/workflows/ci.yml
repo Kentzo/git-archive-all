@@ -129,6 +129,25 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
 
+  stubtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: |
+            .github/scripts/ci-requirements.txt
+            pyproject.toml
+
+      - name: Install tox
+        run: python -m pip install -r .github/scripts/ci-requirements.txt
+
+      - name: Stubtest
+        run: python -m tox -vv -e stubtest
+
   coverage:
     needs: [linux, win-darwin]
     if: ${{ !cancelled() }}
