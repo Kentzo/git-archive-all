@@ -25,6 +25,7 @@
 from contextlib import closing
 import logging
 from os import environ, extsep, fsdecode, fsencode, fspath as _fspath, path, readlink, remove
+import stat
 from subprocess import CalledProcessError, Popen, PIPE, check_output
 import sys
 import re
@@ -179,7 +180,7 @@ class GitArchiver:
                     else:
                         i = ZipInfo(arcname)
                         i.create_system = 3
-                        i.external_attr = 0xA1ED0000
+                        i.external_attr = (stat.S_IFLNK | 0o755) << 16
                         archive.writestr(i, readlink(file_path))
             elif output_format in self.TARFILE_FORMATS:
                 import tarfile
