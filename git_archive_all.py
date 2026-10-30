@@ -357,7 +357,7 @@ class GitArchiver:
         """
         if env is None:
             env = self.git_env()
-        env = dict(env, GIT_FLUSH='1')
+        env = {**env, 'GIT_FLUSH': '1'}
 
         def read_attrs(process, repo_file_path):
             process.stdin.write(repo_file_path + b'\0')
@@ -583,8 +583,7 @@ def main(argv=None):
     else:
         output_name = path.basename(output_file_path)
         output_name = re.sub(
-            '(\\.zip|\\.tar|\\.tbz2|\\.tgz|\\.txz|\\.tzst|\\.bz2|\\.gz|\\.xz|\\.zst'
-            '|\\.tar\\.bz2|\\.tar\\.gz|\\.tar\\.xz|\\.tar\\.zst)$',
+            r'\.(tar|bz2|gz|xz|zip|zst|tbz2|tgz|txz|tzst|tar\.bz2|tar\.gz|tar\.xz|tar\.zst)$',
             '',
             output_name
         ) or "Archive"
