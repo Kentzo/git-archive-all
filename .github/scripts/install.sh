@@ -37,7 +37,7 @@ install_python() {
     local version=$1 ssl
     [ -d "$(pyenv root)/versions/$version" ] && return
     # These don't support the system's OpenSSL 3.
-    if [[ $version == 3.[6-9].* ]]; then
+    if [[ $version == 3.[7-9].* ]]; then
         ssl=1.1.1w
         install_openssl "$ssl"
         local -x CPPFLAGS="-I$openssl_root/$ssl/include"

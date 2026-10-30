@@ -172,13 +172,7 @@ class GitArchiver:
             if output_format in self.ZIPFILE_FORMATS:
                 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-                if compresslevel is not None:
-                    if sys.version_info > (3, 7):
-                        archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
-                    else:
-                        raise ValueError("Compression level for zip archives requires Python 3.7+")
-                else:
-                    archive = ZipFile(path.abspath(output_path), 'w')
+                archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
 
                 def add_file(file_path, arcname):
                     if not path.islink(file_path):
