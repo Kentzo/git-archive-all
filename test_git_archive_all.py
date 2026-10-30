@@ -5,7 +5,8 @@ import os
 from pathlib import Path, PurePosixPath
 from subprocess import check_call
 import sys
-from tarfile import TarFile, PAX_FORMAT
+from tarfile import TarFile
+from zipfile import ZipFile
 
 import pycodestyle
 import pytest
@@ -85,7 +86,7 @@ class Repo:
         return r
 
     def init(self):
-        os.mkdir(self.path)
+        self.path.mkdir()
         check_call(['git', 'init'], cwd=self.path)
 
     def add(self, rel_path, record):
@@ -104,7 +105,7 @@ class Repo:
         with file_path.open('wb') as f:
             f.write(contents)
 
-        check_call(['git', 'add', file_path.as_posix()], cwd=self.path)
+        check_call(['git', 'add', file_path], cwd=self.path)
         return file_path
 
     def add_dir(self, rel_path, contents):
@@ -114,13 +115,13 @@ class Repo:
         for k, v in contents.items():
             self.add(dir_path / fspath(k), v)
 
-        check_call(['git', 'add', dir_path.as_posix()], cwd=self.path)
+        check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
 
     def add_submodule(self, rel_path, contents):
         submodule_path = self.path / rel_path
         Repo.create(submodule_path, contents)
-        check_call(['git', 'submodule', 'add', submodule_path.as_posix()], cwd=self.path)
+        check_call(['git', 'submodule', 'add', submodule_path], cwd=self.path)
         return submodule_path
 
     def commit(self, message):
@@ -133,7 +134,7 @@ class Repo:
         a = GitArchiver(exclude=exclude, main_repo_abspath=self.path)
         a.create(path)
 
-        with TarFile(path, format=PAX_FORMAT, encoding='utf-8') as tar_file:
+        with TarFile(path, encoding='utf-8') as tar_file:
             actual = make_actual_tree(tar_file)
 
         assert actual == make_expected_tree(self.contents, exclude)
@@ -423,7 +424,7 @@ def test_cli(tmp_path, repo):
     repo_tar_path = fspath(tmp_path / 'repo.tar')
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fspath(repo.path), repo_tar_path])
 
-    with TarFile(repo_tar_path, format=PAX_FORMAT, encoding='utf-8') as repo_tar:
+    with TarFile(repo_tar_path, encoding='utf-8') as repo_tar:
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
 
 
