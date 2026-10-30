@@ -10,7 +10,7 @@ readme = "README.rst"
 license = "MIT"
 license-files = ["LICENSE.txt"]
 authors = [{name = "Ilya Kulakov", email = "kulakov.ilya@gmail.com"}]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -24,7 +24,6 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -40,16 +39,31 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/Kentzo/git-archive-all"
+Changelog = "https://github.com/Kentzo/git-archive-all/blob/master/CHANGES.rst"
+Issues = "https://github.com/Kentzo/git-archive-all/issues"
 
 [project.scripts]
 git-archive-all = "git_archive_all:main"
 
+[dependency-groups]
+test = [
+    "pycodestyle==2.12.1; python_version < '3.9'",
+    "pycodestyle==2.14.0; python_version == '3.9'",
+    "pycodestyle==2.15.0; python_version >= '3.10'",
+    "pytest==8.3.5; python_version < '3.9'",
+    "pytest==8.4.2; python_version == '3.9'",
+    "pytest==9.2.0; python_version >= '3.10'",
+    "pytest-cov==5.0.0; python_version < '3.9'",
+    "pytest-cov==7.1.0; python_version >= '3.9'",
+    "pytest-mock==3.14.1; python_version < '3.9'",
+    "pytest-mock==3.15.1; python_version == '3.9'",
+    "pytest-mock==3.17.0; python_version >= '3.10'",
+    # coverage needs it to read pyproject.toml before Python 3.11.
+    "tomli==2.0.1; python_version < '3.11'",
+]
 [tool.setuptools]
 py-modules = ["git_archive_all"]
 packages = ["git_archive_all-stubs"]
-
-[tool.setuptools.package-data]
-"*" = ["*.pyi"]
 
 [tool.setuptools.dynamic]
 version = {attr = "git_archive_all.__version__"}
@@ -63,22 +77,11 @@ filterwarnings = ["error"]
 relative_files = true
 
 [tool.tox]
-legacy_tox_ini = """
-[tox]
-envlist =
-    py37
-    py38
-    py39
-    py310
-    py311
-    py312
-    py313
-    py314
-    py315
-    pypy3
-skipsdist = true
+requires = ["tox>=4.22"]  # dependency_groups
+env_list = ["py38", "py39", "py310", "py311", "py312", "py313", "py314", "py315", "pypy3"]
+no_package = true
 
-[testenv]
-deps = -rtest-requirements.txt
-commands = pytest {posargs}
-"""
+[tool.tox.env_run_base]
+dependency_groups = ["test"]
+commands = [["pytest", { replace = "posargs", extend = true }]]
+
