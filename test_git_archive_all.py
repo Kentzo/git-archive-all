@@ -632,6 +632,41 @@ def test_git_in_cwd(tmp_path, repo, monkeypatch):
     repo.assert_archive(repo_tar_path)
 
 
+@pytest.mark.skipif(sys.platform != 'win32', reason="Windows only.")
+@pytest.mark.parametrize('output_format', [
+    'tar',
+    'zip'
+])
+def test_backslash_separator(output_format, tmp_path, repo, monkeypatch):
+    """
+    Ensure that backslash-separated paths are accepted on Windows and archived with forward slashes.
+    """
+    extra_path = tmp_path / 'extra' / 'file.dat'
+    extra_path.parent.mkdir()
+    extra_path.write_bytes(b'Namespaces are one honking great idea -- let\'s do more of those!')
+    monkeypatch.chdir(tmp_path)
+
+    a = GitArchiver(prefix='archive\\root\\', extra=['extra\\file.dat'], main_repo_abspath=fspath(repo.path))
+
+    expected = make_expected_tree(repo.contents)
+    assert sorted(a.walk_git_files()) == sorted(k.replace('/', '\\') for k in expected)
+
+    repo_archive_path = tmp_path / f'repo.{output_format}'
+    a.create(repo_archive_path)
+
+    expected = {f'archive/root/{k}': v for k, v in expected.items()}
+    expected['archive/root/extra/file.dat'] = extra_path.read_bytes()
+
+    if output_format == 'zip':
+        with ZipFile(repo_archive_path) as zip_file:
+            actual = {i.filename: zip_file.read(i) for i in zip_file.infolist()}
+    else:
+        with TarFile(repo_archive_path, encoding='utf-8') as tar_file:
+            actual = make_actual_tree(tar_file)
+
+    assert actual == expected
+
+
 def test_pycodestyle():
     style = pycodestyle.StyleGuide(repeat=True, max_line_length=240)
     report = style.check_files(['git_archive_all.py'])
