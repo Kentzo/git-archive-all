@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
+        python: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
                  'pypy3.12', '3', 'pypy3']
     steps:
       - uses: actions/checkout@v7
@@ -94,14 +94,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-26-intel, macos-latest]
-        python: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
+        python: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15',
                  'pypy3.12']
         exclude:
           # CPython supports arm64 macOS since 3.8.10 and 3.9.1.
-          - {os: macos-latest, python: '3.6'}
           - {os: macos-latest, python: '3.7'}
           # setup-python's builds load OpenSSL 1.1 from Homebrew's openssl@1.1, which Homebrew no longer provides.
-          - {os: macos-26-intel, python: '3.6'}
           - {os: macos-26-intel, python: '3.7'}
     defaults:
       run:
