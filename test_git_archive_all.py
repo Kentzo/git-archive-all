@@ -593,6 +593,19 @@ def test_git_version_parse(version, mocker):
     assert GitArchiver.get_git_version() == (2, 21, 0, 0, 1)
 
 
+@pytest.mark.parametrize('output, unparsed', [
+    pytest.param(b'git version', 'git version', id='No version'),
+    pytest.param(b'git version 2.\xc2\xb2', '2.\u00b2', id='Non-ASCII digit'),
+])
+def test_git_version_parse_error(output, unparsed, mocker, caplog):
+    """
+    Ensure that unparsable version is logged as text.
+    """
+    mocker.patch.object(GitArchiver, 'run_git_shell', return_value=output)
+    assert GitArchiver.get_git_version() is None
+    assert caplog.messages == [f'Unable to parse Git version "{unparsed}".']
+
+
 @pytest.mark.skipif(sys.platform != 'win32', reason="Windows only.")
 @pytest.mark.parametrize('contents', [
     pytest.param(git_in_cwd, id='git in cwd')

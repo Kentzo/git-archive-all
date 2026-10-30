@@ -445,7 +445,7 @@ class GitArchiver:
         If version cannot be parsed None is returned.
         """
         try:
-            output = cls.run_git_shell('git version')
+            output = cls.run_git_shell('git version').decode('utf-8', 'replace')
         except CalledProcessError:
             cls.LOG.warning("Unable to get Git version.")
             return None
@@ -457,7 +457,7 @@ class GitArchiver:
             return None
 
         try:
-            return tuple(int(v) if v.isdigit() else 0 for v in version.split(b'.'))
+            return tuple(int(v) if v.isdigit() else 0 for v in version.split('.'))
         except ValueError:
             cls.LOG.warning("Unable to parse Git version \"%s\".", version)
             return None
