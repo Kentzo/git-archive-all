@@ -36,7 +36,7 @@ def git_fsdecode(filename):
     """
     Decode filename from git output into str.
     """
-    if sys.platform.startswith('win32'):
+    if sys.platform == 'win32':
         return filename.decode('utf-8')
     else:
         return fsdecode(filename)
@@ -46,7 +46,7 @@ def git_fsencode(filename):
     """
     Encode filename from str into git input.
     """
-    if sys.platform.startswith('win32'):
+    if sys.platform == 'win32':
         return filename.encode('utf-8')
     else:
         return fsencode(filename)
@@ -428,7 +428,7 @@ class GitArchiver:
         """
         env = dict(environ)
 
-        if sys.platform.startswith('win32') and 'NoDefaultCurrentDirectoryInExePath' not in environ:
+        if sys.platform == 'win32' and 'NoDefaultCurrentDirectoryInExePath' not in environ:
             env['NoDefaultCurrentDirectoryInExePath'] = '1'
 
         return env
@@ -498,7 +498,7 @@ class GitArchiver:
         )
         repo_file_paths = repo_file_paths.split(b'\0')[:-1]
 
-        if sys.platform.startswith('win32'):
+        if sys.platform == 'win32':
             repo_file_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_file_paths)
         else:
             repo_file_paths = map(git_fsdecode, repo_file_paths)
@@ -510,7 +510,7 @@ class GitArchiver:
         """
         Return a list of all direct submodules as seen by git in a given repo.
         """
-        if sys.platform.startswith('win32'):
+        if sys.platform == 'win32':
             shell_command = 'git submodule foreach --quiet "printf \'%s\\0\' \\"$sm_path\\""'
         else:
             shell_command = 'git submodule foreach --quiet \'printf "%s\\0" "$sm_path"\''
@@ -518,7 +518,7 @@ class GitArchiver:
         repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath, env=env)
         repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]
 
-        if sys.platform.startswith('win32'):
+        if sys.platform == 'win32':
             repo_submodule_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_submodule_paths)
         else:
             repo_submodule_paths = map(git_fsdecode, repo_submodule_paths)
