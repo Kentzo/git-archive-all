@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-from __future__ import unicode_literals
-
 from copy import deepcopy
 import errno
 from functools import partial
@@ -60,8 +57,8 @@ def git_env(tmpdir_factory, monkeypatch):
     3. .gitmodules file is ignored by default
     """
     e = {
-        str('GIT_CONFIG_NOSYSTEM'): str('true'),
-        str('HOME'): tmpdir_factory.getbasetemp().strpath
+        'GIT_CONFIG_NOSYSTEM': 'true',
+        'HOME': tmpdir_factory.getbasetemp().strpath
     }
 
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('wb+') as f:
@@ -462,6 +459,25 @@ def test_cli(tmpdir, repo):
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
 
 
+@pytest.mark.parametrize('contents', [
+    pytest.param(unicode_base, id='Unicode'),
+])
+@pytest.mark.parametrize('option', [
+    '-v',
+    '--dry-run'
+])
+def test_cli_log(option, tmpdir, repo, capfd):
+    """
+    Ensure that CLI logs non-ASCII paths.
+    """
+    repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
+    capfd.readouterr()
+    git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', repo.path, repo_tar_path])
+    out, _ = capfd.readouterr()
+
+    assert ' => {}\n'.format(os.path.join('data', 'مرحبا بالعالم.dat')) in out
+
+
 @pytest.mark.parametrize('env_vars', [
     pytest.param({'GIT_DIR': '.git'}, id='GIT_DIR'),
     pytest.param({'GIT_DIR': '.git', 'GIT_WORK_TREE': '.'}, id='GIT_DIR and GIT_WORK_TREE'),
@@ -478,7 +494,7 @@ def test_submodule_local_env(env_vars, tmpdir, repo, monkeypatch):
 
     for name, value in env_vars.items():
         # Absolute, otherwise each git command would resolve against its own cwd.
-        monkeypatch.setenv(str(name), os_path_join(repo.path, value))
+        monkeypatch.setenv(name, os_path_join(repo.path, value))
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.assert_archive(repo_tar_path)
@@ -502,10 +518,10 @@ def test_submodule_config_env(env_var, tmpdir, repo, monkeypatch):
         }
 
     for name, value in config_env.items():
-        monkeypatch.setenv(str(name), str(value))
+        monkeypatch.setenv(name, value)
 
     # Every repository is now considered to be of dubious ownership unless safe.directory reaches it.
-    monkeypatch.setenv(str('GIT_TEST_ASSUME_DIFFERENT_OWNER'), str('1'))
+    monkeypatch.setenv('GIT_TEST_ASSUME_DIFFERENT_OWNER', '1')
 
     repo_tar_path = os_path_join(tmpdir.strpath, 'repo.tar')
     repo.assert_archive(repo_tar_path)
@@ -553,7 +569,7 @@ def test_cli_error_cleanup(output_format, tmpdir, repo):
     (True, False),
     (True, True)
 ])
-def test_error_cleanup_error(fail_close, fail_remove, tmpdir, repo, monkeypatch, caplog):
+def test_error_cleanup_error(fail_close, fail_remove, tmpdir, repo, monkeypatch):
     """
     Ensure that errors during cleanup do not hide the original exception.
     """
@@ -588,17 +604,14 @@ def test_error_cleanup_error(fail_close, fail_remove, tmpdir, repo, monkeypatch,
         expected += [errno.EIO]
     expected += [errno.ENOENT]
 
-    if sys.version_info >= (3,):
-        actual = []
-        context = e.value
+    actual = []
+    context = e.value
 
-        while context is not None:
-            actual.append(context.errno)
-            context = context.__context__
+    while context is not None:
+        actual.append(context.errno)
+        context = context.__context__
 
-        assert actual == expected
-    else:
-        assert e.value.errno == errno.ENOENT
+    assert actual == expected
 
     assert os.path.exists(repo_tar_path) == fail_remove
 
