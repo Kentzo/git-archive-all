@@ -29,7 +29,7 @@ from __future__ import unicode_literals
 from contextlib import closing
 import logging
 from os import environ, extsep, path, readlink, remove
-from subprocess import CalledProcessError, Popen, PIPE
+from subprocess import CalledProcessError, Popen, PIPE, check_output
 import sys
 import re
 
@@ -510,7 +510,7 @@ class GitArchiver(object):
     @classmethod
     def run_git_shell(cls, cmd, cwd=None, env=None):
         """
-        Run git shell command, read output and decode it into a unicode string.
+        Run git shell command and read its output.
 
         @param cmd: Command to be executed.
 
@@ -518,20 +518,14 @@ class GitArchiver(object):
 
         @param env: Environment variables for the process. Defaults to cls.git_env().
 
-        @return: Output of the command.
+        @return: Output of the command as bytes.
 
         @raise CalledProcessError: Raises exception if return code of the command is non-zero.
         """
         if env is None:
             env = cls.git_env()
 
-        p = Popen(cmd, shell=True, stdout=PIPE, cwd=cwd, env=env)
-        output, _ = p.communicate()
-
-        if p.returncode:
-            raise CalledProcessError(returncode=p.returncode, cmd=cmd, output=output)
-
-        return output
+        return check_output(cmd, shell=True, cwd=cwd, env=env)
 
     @classmethod
     def get_git_version(cls):
