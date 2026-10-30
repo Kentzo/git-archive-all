@@ -61,6 +61,8 @@ test = [
     # coverage needs it to read pyproject.toml before Python 3.11.
     "tomli==2.0.1; python_version < '3.11'",
 ]
+stubtest = ["mypy==2.4.1"]
+
 [tool.setuptools]
 py-modules = ["git_archive_all"]
 packages = ["git_archive_all-stubs"]
@@ -78,10 +80,14 @@ relative_files = true
 
 [tool.tox]
 requires = ["tox>=4.22"]  # dependency_groups
-env_list = ["py38", "py39", "py310", "py311", "py312", "py313", "py314", "py315", "pypy3"]
+env_list = ["py38", "py39", "py310", "py311", "py312", "py313", "py314", "py315", "pypy3", "stubtest"]
 no_package = true
 
 [tool.tox.env_run_base]
 dependency_groups = ["test"]
 commands = [["pytest", { replace = "posargs", extend = true }]]
 
+[tool.tox.env.stubtest]
+dependency_groups = ["stubtest"]
+set_env = { MYPYPATH = "{tox_root}" }
+commands = [["python", "-m", "mypy.stubtest", "git_archive_all"]]
