@@ -350,10 +350,6 @@ class GitArchiver:
             env = self.git_env()
         env = dict(env, GIT_FLUSH='1')
 
-        def make_process():
-            cmd = 'git check-attr --stdin -z {}'.format(' '.join(attrs))
-            return Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env)
-
         def read_attrs(process, repo_file_path):
             process.stdin.write(repo_file_path + b'\0')
             process.stdin.flush()
@@ -385,9 +381,9 @@ class GitArchiver:
         if not attrs:
             return
 
-        process = make_process()
+        cmd = f"git check-attr --stdin -z {' '.join(attrs)}"
 
-        try:
+        with Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env) as process:
             while True:
                 repo_file_path = yield
                 repo_file_path = git_fsencode(fspath(repo_file_path))
@@ -398,10 +394,6 @@ class GitArchiver:
                     repo_file_attrs[attr] = value
 
                 yield repo_file_attrs
-        finally:
-            process.stdin.close()
-            process.wait()
-            process.stdout.close()
 
     def resolve_git_main_repo_abspath(self, abspath):
         """
