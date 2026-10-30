@@ -24,7 +24,7 @@
 
 from contextlib import closing
 import logging
-from os import environ, extsep, fsdecode, fsencode, fspath as _fspath, path, readlink, remove
+from os import environ, extsep, fsdecode, fsencode, path, readlink, remove
 import stat
 from subprocess import CalledProcessError, Popen, PIPE, check_output
 import sys
@@ -57,8 +57,7 @@ def fspath(filename):
     """
     Convert filename into str.
     """
-    # PEP 519 recommends os.fspath() followed by os.fsdecode() when str is required.
-    return fsdecode(_fspath(filename))
+    return fsdecode(filename)
 
 
 class GitArchiver:
