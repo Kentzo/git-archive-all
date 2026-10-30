@@ -14,7 +14,7 @@ from git_archive_all import GitArchiver, fspath
 
 
 def as_posix(p):
-    if sys.platform.startswith('win32'):
+    if sys.platform == 'win32':
         return p.replace(b'\\', b'/') if isinstance(p, bytes) else p.replace('\\', '/')
     else:
         return p
@@ -386,8 +386,8 @@ def repo(contents, tmpdir, git_env):
     return Repo.create(os_path_join(tmpdir.strpath, 'repo'), contents)
 
 
-skipif_file_darwin = pytest.mark.skipif(sys.platform.startswith('darwin'), reason='Invalid macOS filename.')
-skipif_file_win32 = pytest.mark.skipif(sys.platform.startswith('win32'), reason="Invalid Windows filename.")
+skipif_file_darwin = pytest.mark.skipif(sys.platform == 'darwin', reason='Invalid macOS filename.')
+skipif_file_win32 = pytest.mark.skipif(sys.platform == 'win32', reason="Invalid Windows filename.")
 
 git_version = GitArchiver.get_git_version()
 skipif_git_config_count = pytest.mark.skipif(git_version is None or git_version < (2, 31), reason="GIT_CONFIG_COUNT requires git 2.31+")
@@ -605,7 +605,7 @@ def test_git_version_parse(version, mocker):
     assert GitArchiver.get_git_version() == (2, 21, 0, 0, 1)
 
 
-@pytest.mark.skipif(not sys.platform.startswith('win32'), reason="Windows only.")
+@pytest.mark.skipif(sys.platform != 'win32', reason="Windows only.")
 @pytest.mark.parametrize('contents', [
     pytest.param(git_in_cwd, id='git in cwd')
 ])
