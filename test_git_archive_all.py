@@ -23,14 +23,6 @@ import git_archive_all
 from git_archive_all import GitArchiver, fspath
 
 
-def makedirs(p):
-    try:
-        os.makedirs(p)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-
-
 def as_posix(p):
     if sys.platform.startswith('win32'):
         return p.replace(b'\\', b'/') if isinstance(p, bytes) else p.replace('\\', '/')
@@ -139,7 +131,7 @@ class Repo:
 
     def add_dir(self, rel_path, contents):
         dir_path = os_path_join(self.path, rel_path)
-        makedirs(dir_path)
+        os.makedirs(dir_path, exist_ok=True)
 
         for k, v in contents.items():
             self.add(as_posix(os.path.normpath(os_path_join(dir_path, k))), v)
