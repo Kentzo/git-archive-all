@@ -482,7 +482,7 @@ class GitArchiver:
     @classmethod
     def list_repo_files(cls, repo_abspath, env=None):
         """
-        Return a list of all files as seen by git in a given repo.
+        Return an iterator over all files as seen by git in a given repo.
         """
         repo_file_paths = cls.run_git_shell(
             'git ls-files -z --cached --full-name --no-empty-directory',
@@ -490,18 +490,12 @@ class GitArchiver:
             env=env
         )
         repo_file_paths = repo_file_paths.split(b'\0')[:-1]
-
-        if sys.platform == 'win32':
-            repo_file_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_file_paths)
-        else:
-            repo_file_paths = map(git_fsdecode, repo_file_paths)
-
-        return repo_file_paths
+        return (git_fsdecode(p).replace('/', path.sep) for p in repo_file_paths)
 
     @classmethod
     def list_repo_submodules(cls, repo_abspath, env=None):
         """
-        Return a list of all direct submodules as seen by git in a given repo.
+        Return an iterator over all direct submodules as seen by git in a given repo.
         """
         if sys.platform == 'win32':
             shell_command = 'git submodule foreach --quiet "printf \'%s\\0\' \\"$sm_path\\""'
@@ -510,13 +504,7 @@ class GitArchiver:
 
         repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath, env=env)
         repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]
-
-        if sys.platform == 'win32':
-            repo_submodule_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_submodule_paths)
-        else:
-            repo_submodule_paths = map(git_fsdecode, repo_submodule_paths)
-
-        return repo_submodule_paths
+        return (git_fsdecode(p).replace('/', path.sep) for p in repo_submodule_paths)
 
 
 def main(argv=None):
