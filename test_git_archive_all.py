@@ -54,7 +54,7 @@ def git_env(tmpdir_factory, monkeypatch):
     with tmpdir_factory.getbasetemp().join('.gitconfig').open('wb+') as f:
         f.writelines([
             b'[core]\n',
-            'attributesfile = {0}\n'.format(as_posix(tmpdir_factory.getbasetemp().join('.gitattributes').strpath)).encode(),
+            f"attributesfile = {(home_path / '.gitattributes').as_posix()}\n".encode(),
             b'[user]\n',
             b'name = git-archive-all\n',
             b'email = git-archive-all@example.com\n',
@@ -465,7 +465,7 @@ def test_cli_log(option, tmpdir, repo, capfd):
     git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', repo.path, repo_tar_path])
     out, _ = capfd.readouterr()
 
-    assert ' => {}\n'.format(os.path.join('data', 'مرحبا بالعالم.dat')) in out
+    assert f" => {os.path.join('data', 'مرحبا بالعالم.dat')}\n" in out
 
 
 @pytest.mark.parametrize('env_vars', [
