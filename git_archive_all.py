@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 # coding=utf-8
 
 # The MIT License (MIT)
@@ -23,38 +23,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from __future__ import print_function
-from __future__ import unicode_literals
-
 from contextlib import closing
 import logging
-from os import environ, extsep, path, readlink, remove
+from os import environ, extsep, fsdecode, fsencode, fspath as _fspath, path, readlink, remove
 from subprocess import CalledProcessError, Popen, PIPE, check_output
 import sys
 import re
 
 __version__ = "1.24.0.dev0"
-
-
-try:
-    # Python 3.2+
-    from os import fsdecode
-except ImportError:
-    def fsdecode(filename):
-        if not isinstance(filename, unicode):
-            return filename.decode(sys.getfilesystemencoding(), 'strict')
-        else:
-            return filename
-
-try:
-    # Python 3.2+
-    from os import fsencode
-except ImportError:
-    def fsencode(filename):
-        if not isinstance(filename, bytes):
-            return filename.encode(sys.getfilesystemencoding(), 'strict')
-        else:
-            return filename
 
 
 def git_fsdecode(filename):
@@ -77,47 +53,15 @@ def git_fsencode(filename):
         return fsencode(filename)
 
 
-try:
-    # Python 3.6+
-    from os import fspath as _fspath
-
-    def fspath(filename, decoder=fsdecode, encoder=fsencode):
-        """
-        Convert filename into bytes or str, depending on what's the best type
-        to represent paths for current Python and platform.
-        """
-        # Python 3.6+: str can represent any path (PEP 383)
-        #   str is not required on Windows (PEP 529)
-        # Decoding is still applied for consistency and to follow PEP 519 recommendation.
-        return decoder(_fspath(filename))
-except ImportError:
-    def fspath(filename, decoder=fsdecode, encoder=fsencode):
-        # Python 3.5: str can represent any path (PEP 383),
-        #   but str is required on Windows (no PEP 529)
-        #
-        # Python 2.7: str cannot represent any path (no PEP 383),
-        #   str is required on Windows (no PEP 529)
-        #   bytes is required on POSIX (no PEP 383)
-        if sys.version_info > (3,):
-            import pathlib
-            if isinstance(filename, pathlib.PurePath):
-                return str(filename)
-            else:
-                return decoder(filename)
-        elif sys.platform.startswith('win32'):
-            return decoder(filename)
-        else:
-            return encoder(filename)
-
-
-def git_fspath(filename):
+def fspath(filename):
     """
-    fspath representation of git output.
+    Convert filename into str.
     """
-    return fspath(filename, git_fsdecode, git_fsencode)
+    # PEP 519 recommends os.fspath() followed by os.fsdecode() when str is required.
+    return fsdecode(_fspath(filename))
 
 
-class GitArchiver(object):
+class GitArchiver:
     """
     GitArchiver
 
@@ -222,7 +166,7 @@ class GitArchiver(object):
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
             output_format = file_ext[len(extsep):].lower()
-            self.LOG.debug("Output format is not explicitly set, determined format is {}.".format(output_format))
+            self.LOG.debug("Output format is not explicitly set, determined format is %s.", output_format)
 
         if not dry_run:
             if output_format in self.ZIPFILE_FORMATS:
@@ -270,13 +214,13 @@ class GitArchiver(object):
                 raise ValueError("unknown format: {}".format(output_format))
 
             def archiver(file_path, arcname):
-                self.LOG.debug(fspath("{} => {}").format(file_path, arcname))
+                self.LOG.debug("%s => %s", file_path, arcname)
                 add_file(file_path, arcname)
         else:
             archive = None
 
             def archiver(file_path, arcname):
-                self.LOG.info(fspath("{} => {}").format(file_path, arcname))
+                self.LOG.info("%s => %s", file_path, arcname)
 
         is_archived = False
 
@@ -287,23 +231,12 @@ class GitArchiver(object):
             if archive is not None:
                 if is_archived:
                     archive.close()
-                elif sys.version_info >= (3,):
-                    # Python 3: cleanup errors are chained to the original exception.
+                else:
+                    # Cleanup errors are chained to the original exception.
                     try:
                         archive.close()
                     finally:
                         remove(path.abspath(output_path))
-                else:
-                    # Python 2.7: replaces the original exception with cleanup errors, so they are only logged.
-                    try:
-                        archive.close()
-                    except BaseException as e:
-                        self.LOG.warning("Unable to close incomplete archive: {}".format(e))
-
-                    try:
-                        remove(path.abspath(output_path))
-                    except BaseException as e:
-                        self.LOG.warning("Unable to remove incomplete archive: {}".format(e))
 
     def is_file_excluded(self, repo_abspath, repo_file_path):
         """
@@ -353,7 +286,7 @@ class GitArchiver(object):
             for file_path in git_files:
                 archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
 
-    def walk_git_files(self, repo_path=fspath(''), env=None):
+    def walk_git_files(self, repo_path='', env=None):
         """
         An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive. Skips files that match
@@ -365,7 +298,7 @@ class GitArchiver(object):
 
         @return: Generator to traverse files under git control relative to main_repo_abspath.
         """
-        repo_abspath = path.join(self.main_repo_abspath, fspath(repo_path))
+        repo_abspath = path.join(self.main_repo_abspath, repo_path)
         assert repo_abspath not in self._check_attr_gens
         self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'], env=env)
 
@@ -491,7 +424,7 @@ class GitArchiver(object):
         """
         try:
             main_repo_abspath = self.run_git_shell('git rev-parse --show-toplevel', cwd=abspath).rstrip()
-            return path.abspath(git_fspath(main_repo_abspath))
+            return path.abspath(git_fsdecode(main_repo_abspath))
         except CalledProcessError as e:
             raise ValueError("{} is not part of a git repository ({})".format(abspath, e.returncode))
 
@@ -573,9 +506,9 @@ class GitArchiver(object):
         repo_file_paths = repo_file_paths.split(b'\0')[:-1]
 
         if sys.platform.startswith('win32'):
-            repo_file_paths = (git_fspath(p.replace(b'/', b'\\')) for p in repo_file_paths)
+            repo_file_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_file_paths)
         else:
-            repo_file_paths = map(git_fspath, repo_file_paths)
+            repo_file_paths = map(git_fsdecode, repo_file_paths)
 
         return repo_file_paths
 
@@ -593,9 +526,9 @@ class GitArchiver(object):
         repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]
 
         if sys.platform.startswith('win32'):
-            repo_submodule_paths = (git_fspath(p.replace(b'/', b'\\')) for p in repo_submodule_paths)
+            repo_submodule_paths = (git_fsdecode(p.replace(b'/', b'\\')) for p in repo_submodule_paths)
         else:
-            repo_submodule_paths = map(git_fspath, repo_submodule_paths)
+            repo_submodule_paths = map(git_fsdecode, repo_submodule_paths)
 
         return repo_submodule_paths
 
