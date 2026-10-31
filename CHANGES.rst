@@ -1,6 +1,21 @@
 CHANGES
 =======
 
+1.24.0 (2026-10-31)
+-------------------
+
+- Added support for Zstandard: zst, tzst and tar.zst (requires Python 3.14+).
+- Fixed compression level for xz and txz. See #91
+- Fixed missing type stubs in wheel. See #93
+- Fixed leaked file handles and git processes on error.
+- Fixed dangling incomplete archive on failure.
+- Fixed use of git from the current directory on Windows (e.g. via git.bat): always resolve from ``PATH``.
+- Fixed code injection via .gitmodules
+- Fixed environment of sumbodule commands: clear repository-local variables such as ``GIT_DIR``.
+- Removed support for Python 2.6 and 3.4
+- Removed support for git older than 1.8.5 (was 1.6.1)
+- Removed ``setup.py test`` command
+
 1.23.1 (2022-10-02)
 -------------------
 
