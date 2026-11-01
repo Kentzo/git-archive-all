@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 
 from copy import deepcopy
 import errno
+import warnings
 from functools import partial
 import os
 from subprocess import check_call
