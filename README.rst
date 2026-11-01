@@ -1,24 +1,24 @@
 | |pypi| |homebrew|
 | |implementations| |versions|
-| |travis| |coverage|
+| |ci| |coverage|
 
 .. |pypi| image:: https://img.shields.io/pypi/v/git-archive-all.svg
-    :target: https://pypi.python.org/pypi/git-archive-all
+    :target: https://pypi.org/project/git-archive-all/
     :alt: PyPI
 .. |homebrew| image:: https://img.shields.io/homebrew/v/git-archive-all.svg
     :target: https://formulae.brew.sh/formula/git-archive-all
     :alt: Homebrew
 .. |versions| image:: https://img.shields.io/pypi/pyversions/git-archive-all.svg
-    :target: https://pypi.python.org/pypi/git-archive-all
+    :target: https://pypi.org/project/git-archive-all/
     :alt: Supported Python versions
 .. |implementations| image:: https://img.shields.io/pypi/implementation/git-archive-all.svg
-    :target: https://pypi.python.org/pypi/git-archive-all
+    :target: https://pypi.org/project/git-archive-all/
     :alt: Supported Python implementations
-.. |travis| image:: https://travis-ci.org/Kentzo/git-archive-all.svg?branch=master
-    :target: https://travis-ci.org/Kentzo/git-archive-all
-    :alt: Travis
-.. |coverage| image:: https://codecov.io/gh/Kentzo/git-archive-all/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/Kentzo/git-archive-all/branch/master
+.. |ci| image:: https://github.com/Kentzo/git-archive-all/actions/workflows/ci.yml/badge.svg?branch=1.x
+    :target: https://github.com/Kentzo/git-archive-all/actions/workflows/ci.yml?query=branch%3A1.x
+    :alt: CI
+.. |coverage| image:: https://codecov.io/gh/Kentzo/git-archive-all/branch/1.x/graph/badge.svg
+    :target: https://codecov.io/gh/Kentzo/git-archive-all/branch/1.x
     :alt: Coverage
 
 Archive a repository with all its submodules.
