@@ -1,7 +1,7 @@
 CHANGES
 =======
 
-1.24.0.dev0 (2026-10-31)
+1.24.0 (2026-11-01)
 -------------------
 
 - Added support for Zstandard: zst, tzst and tar.zst (requires Python 3.14+).
