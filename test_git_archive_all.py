@@ -6,7 +6,7 @@ from os import fsdecode
 from pathlib import Path, PurePosixPath
 from subprocess import check_call
 import sys
-from tarfile import TarFile
+from tarfile import GNU_FORMAT, GNU_MAGIC, TarFile
 from zipfile import ZipFile
 
 try:
@@ -689,4 +689,19 @@ def test_cli_compresslevel(output_format, compresslevel, tmp_path, repo):
     git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fsdecode(repo.path), compresslevel, repo_archive_path])
 
     with TarFile.open(repo_archive_path, encoding='utf-8') as repo_tar:
+        assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
+
+
+def test_archive_kwargs_tar_format(tmp_path, repo):
+    """
+    Ensure that archive_kwargs are passed to tarfile.
+    """
+    repo_tar_path = tmp_path / 'repo.tar'
+    a = GitArchiver(prefix='', main_repo_abspath=fsdecode(repo.path))
+    a.create(repo_tar_path, archive_kwargs={'format': GNU_FORMAT})
+
+    # Default PAX format uses the POSIX magic, GNU format has its own.
+    assert repo_tar_path.read_bytes()[257:265] == GNU_MAGIC
+
+    with TarFile(repo_tar_path, encoding='utf-8') as repo_tar:
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)

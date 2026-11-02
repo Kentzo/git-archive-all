@@ -136,7 +136,7 @@ class GitArchiver:
             except ValueError:
                 pass
 
-    def create(self, output_path, dry_run=False, output_format=None, compresslevel=None):
+    def create(self, output_path, dry_run=False, output_format=None, compresslevel=None, *, archive_kwargs=None):
         """
         Create the archive at output_file_path.
 
@@ -151,6 +151,8 @@ class GitArchiver:
             of output_file_path.
 
         @param compresslevel: Optional compression level. Interpretation depends on the output format.
+
+        @param archive_kwargs: Optional kwargs, that take precedence, passed to ZipFile or tarfile.open, depending on the output format.
         """
         output_path = fsdecode(output_path)
 
@@ -159,15 +161,19 @@ class GitArchiver:
             output_format = file_ext[len(extsep):].lower()
             self.LOG.debug("Output format is not explicitly set, determined format is %s.", output_format)
 
+        if archive_kwargs is None:
+            archive_kwargs = {}
+
         if not dry_run:
             if output_format in self.ZIPFILE_FORMATS:
                 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-                archive = ZipFile(path.abspath(output_path), 'w', compresslevel=compresslevel)
+                archive_kwargs = {'compression': ZIP_DEFLATED, 'compresslevel': compresslevel, **archive_kwargs}
+                archive = ZipFile(path.abspath(output_path), 'w', **archive_kwargs)
 
                 def add_file(file_path, arcname):
                     if not path.islink(file_path):
-                        archive.write(file_path, arcname, ZIP_DEFLATED)
+                        archive.write(file_path, arcname)
                     else:
                         i = ZipInfo(arcname)
                         i.create_system = 3
@@ -179,19 +185,18 @@ class GitArchiver:
                 mode = self.TARFILE_FORMATS[output_format]
 
                 if compresslevel is not None:
-                    if mode == 'w:xz':
+                    if mode == 'w':
+                        raise ValueError(f"{output_format} cannot be compressed")
+                    elif mode == 'w:xz':
                         compress_kwargs = {'preset': compresslevel}
                     elif mode == 'w:zst':
                         compress_kwargs = {'level': compresslevel}
                     else:
                         compress_kwargs = {'compresslevel': compresslevel}
 
-                    try:
-                        archive = tarfile.open(path.abspath(output_path), mode, **compress_kwargs)
-                    except TypeError:
-                        raise ValueError(f"{output_format} cannot be compressed")
-                else:
-                    archive = tarfile.open(path.abspath(output_path), mode)
+                    archive_kwargs = {**compress_kwargs, **archive_kwargs}
+
+                archive = tarfile.open(path.abspath(output_path), mode, **archive_kwargs)
 
                 def add_file(file_path, arcname):
                     archive.add(file_path, arcname)

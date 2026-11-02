@@ -1,7 +1,7 @@
 from collections.abc import Callable, Collection, Generator, Iterable, Iterator, Mapping, Sequence
 import logging
 from os import PathLike
-from typing import ClassVar, TypeAlias
+from typing import Any, ClassVar, TypeAlias
 
 _PathLike: TypeAlias = str | bytes | PathLike[str] | PathLike[bytes]
 # Yields None when primed with next(), then attributes for each path sent.
@@ -41,7 +41,9 @@ class GitArchiver:
                output_path: _PathLike,
                dry_run: bool = False,
                output_format: str | None = None,
-               compresslevel: int | None = None) -> None: ...
+               compresslevel: int | None = None,
+               *,
+               archive_kwargs: Mapping[str, Any] | None = None) -> None: ...
 
     def is_file_excluded(self, repo_abspath: str, repo_file_path: str) -> bool: ...
 
