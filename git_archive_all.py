@@ -355,31 +355,33 @@ class GitArchiver:
             env = self.git_env()
         env = {**env, 'GIT_FLUSH': '1'}
 
+        def read_field(stdout):
+            chunks = []
+
+            while True:
+                buf = stdout.peek()
+
+                if not buf:
+                    raise RuntimeError("check-attr exited prematurely")
+
+                i = buf.find(b'\0')
+
+                if i >= 0:
+                    chunks.append(stdout.read(i + 1)[:-1])  # consume NUL but drop from field value
+                    return b''.join(chunks)
+
+                chunks.append(stdout.read(len(buf)))
+
         def read_attrs(process, file_repopath):
             process.stdin.write(file_repopath + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
-            attr, info = b'', b''
-            nuls_count = 0
-            nuls_expected = 3 * len(attrs)
-
-            while nuls_count != nuls_expected:
-                b = process.stdout.read(1)
-
-                if b == b'' and process.poll() is not None:
-                    raise RuntimeError("check-attr exited prematurely")
-                elif b == b'\0':
-                    nuls_count += 1
-
-                    if nuls_count % 3 == 0:
-                        yield attr, info
-
-                        attr, info = b'', b''
-                elif nuls_count % 3 == 1:
-                    attr += b
-                elif nuls_count % 3 == 2:
-                    info += b
+            for _ in attrs:
+                read_field(process.stdout)
+                attr = read_field(process.stdout)
+                info = read_field(process.stdout)
+                yield attr, info
 
         if not attrs:
             return
