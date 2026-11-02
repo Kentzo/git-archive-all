@@ -1,6 +1,30 @@
 CHANGES
 =======
 
+2.0.0.dev0 (2026-11-02)
+------------------
+
+- Added support for Zstandard: zst, tzst and tar.zst (requires Python 3.14+).
+- Fixed compression level for xz and txz. See #91
+- Fixed missing type stubs in wheel. See #93
+- Fixed leaked file handles and git processes on error.
+- Fixed dangling incomplete archive on failure.
+- Fixed use of git from the current directory on Windows (e.g. via git.bat): always resolve from ``PATH``.
+- Fixed code injection via .gitmodules
+- Fixed environment of submodule commands: clear repository-local variables such as ``GIT_DIR``.
+- Fixed logging of unparsable git version: logged as text instead of bytes.
+- Changed paths returned by ``GitArchiver`` (e.g. ``walk_git_files``, ``list_repo_files``, ``list_repo_submodules``) to always be ``str``.
+- Removed ``fspath()``; use ``os.fsdecode()`` instead.
+- Removed ``git_fspath()``; use ``git_fsdecode()`` instead.
+- Removed support for Python 2.6, 2.7, 3.4, 3.5, 3.6 and 3.7
+- Removed support for git older than 1.8.5 (was 1.6.1)
+- Removed ``setup.py`` and ``setup.cfg`` in favor of ``pyproject.toml``.
+
+.. note::
+
+   See `CHANGES.rst on the 1.x branch <https://github.com/Kentzo/git-archive-all/blob/1.x/CHANGES.rst>`_
+   for 1.x releases after 1.23.1
+
 1.23.1 (2022-10-02)
 -------------------
 
