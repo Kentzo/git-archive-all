@@ -100,8 +100,7 @@ class GitArchiver:
             with abspath to top-level directory of the repository.
             If None, current cwd is used.
 
-        @param git_version: Version of Git that determines whether various workarounds are on.
-            If None, tries to resolve via Git's CLI.
+        @param git_version: Version of Git. If None, tries to resolve via Git's CLI.
         """
         self._check_attr_gens = {}
         self._ignored_paths_cache = {}
@@ -156,7 +155,7 @@ class GitArchiver:
         output_path = fsdecode(output_path)
 
         if output_format is None:
-            file_name, file_ext = path.splitext(output_path)
+            file_ext = path.splitext(output_path)[1]
             output_format = file_ext[len(extsep):].lower()
             self.LOG.debug("Output format is not explicitly set, determined format is %s.", output_format)
 
