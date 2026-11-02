@@ -1,2 +1,1 @@
 include *.rst
-recursive-include git_archive_all-stubs *.pyi
