@@ -138,9 +138,9 @@ class GitArchiver:
 
     def create(self, output_path, dry_run=False, output_format=None, compresslevel=None, *, archive_kwargs=None):
         """
-        Create the archive at output_file_path.
+        Create the archive at output_path.
 
-        Type of the archive is determined either by extension of output_file_path or by output_format.
+        Type of the archive is determined either by extension of output_path or by output_format.
         Supported formats are: tar, bz2, gz, xz, zip, zst, tbz2, tgz, txz, tzst (subject to Python version).
 
         @param output_path: Output file path.
@@ -148,7 +148,7 @@ class GitArchiver:
         @param dry_run: Determines whether create should do nothing but print what it would archive.
 
         @param output_format: Determines format of the output archive. If None, format is determined from extension
-            of output_file_path.
+            of output_path.
 
         @param compresslevel: Optional compression level. Interpretation depends on the output format.
 
@@ -171,14 +171,14 @@ class GitArchiver:
                 archive_kwargs = {'compression': ZIP_DEFLATED, 'compresslevel': compresslevel, **archive_kwargs}
                 archive = ZipFile(path.abspath(output_path), 'w', **archive_kwargs)
 
-                def add_file(file_path, arcname):
-                    if not path.islink(file_path):
-                        archive.write(file_path, arcname)
+                def add_file(file_abspath, arcname):
+                    if not path.islink(file_abspath):
+                        archive.write(file_abspath, arcname)
                     else:
                         i = ZipInfo(arcname)
                         i.create_system = 3
                         i.external_attr = (stat.S_IFLNK | 0o755) << 16
-                        archive.writestr(i, readlink(file_path))
+                        archive.writestr(i, readlink(file_abspath))
             elif output_format in self.TARFILE_FORMATS:
                 import tarfile
 
@@ -198,19 +198,19 @@ class GitArchiver:
 
                 archive = tarfile.open(path.abspath(output_path), mode, **archive_kwargs)
 
-                def add_file(file_path, arcname):
-                    archive.add(file_path, arcname)
+                def add_file(file_abspath, arcname):
+                    archive.add(file_abspath, arcname)
             else:
                 raise ValueError(f"unknown format: {output_format}")
 
-            def archiver(file_path, arcname):
-                self.LOG.debug("%s => %s", file_path, arcname)
-                add_file(file_path, arcname)
+            def archiver(file_abspath, arcname):
+                self.LOG.debug("%s => %s", file_abspath, arcname)
+                add_file(file_abspath, arcname)
         else:
             archive = None
 
-            def archiver(file_path, arcname):
-                self.LOG.info("%s => %s", file_path, arcname)
+            def archiver(file_abspath, arcname):
+                self.LOG.info("%s => %s", file_abspath, arcname)
 
         is_archived = False
 
@@ -228,13 +228,13 @@ class GitArchiver:
                     finally:
                         remove(path.abspath(output_path))
 
-    def is_file_excluded(self, repo_abspath, repo_file_path):
+    def is_file_excluded(self, repo_abspath, file_repopath):
         """
         Checks whether file at a given path is excluded.
 
         @param repo_abspath: Absolute path to the git repository.
 
-        @param repo_file_path: Path to a file relative to repo_abspath.
+        @param file_repopath: Path to a file relative to repo_abspath.
 
         @return: True if file should be excluded. Otherwise False.
         """
@@ -243,24 +243,24 @@ class GitArchiver:
 
         cache = self._ignored_paths_cache.setdefault(repo_abspath, {})
 
-        if repo_file_path not in cache:
+        if file_repopath not in cache:
             next(self._check_attr_gens[repo_abspath])
-            attrs = self._check_attr_gens[repo_abspath].send(repo_file_path)
+            attrs = self._check_attr_gens[repo_abspath].send(file_repopath)
             export_ignore_attr = attrs['export-ignore']
 
             if export_ignore_attr == b'set':
-                cache[repo_file_path] = True
+                cache[file_repopath] = True
             elif export_ignore_attr == b'unset':
-                cache[repo_file_path] = False
+                cache[file_repopath] = False
             else:
-                repo_file_dir_path = path.dirname(repo_file_path)
+                dir_repopath = path.dirname(file_repopath)
 
-                if repo_file_dir_path:
-                    cache[repo_file_path] = self.is_file_excluded(repo_abspath, repo_file_dir_path)
+                if dir_repopath:
+                    cache[file_repopath] = self.is_file_excluded(repo_abspath, dir_repopath)
                 else:
-                    cache[repo_file_path] = False
+                    cache[file_repopath] = False
 
-        return cache[repo_file_path]
+        return cache[file_repopath]
 
     def archive_all_files(self, archiver):
         """
@@ -269,14 +269,14 @@ class GitArchiver:
         @param archiver: Callable that accepts 2 arguments:
             abspath to file on the system and relative path within archive.
         """
-        for file_path in self.extra:
-            archiver(path.abspath(file_path), path.join(self.prefix, file_path))
+        for e in self.extra:
+            archiver(path.abspath(e), path.join(self.prefix, e))
 
         with closing(self.walk_git_files()) as git_files:
-            for file_path in git_files:
-                archiver(path.join(self.main_repo_abspath, file_path), path.join(self.prefix, file_path))
+            for file_mainpath in git_files:
+                archiver(path.join(self.main_repo_abspath, file_mainpath), path.join(self.prefix, file_mainpath))
 
-    def walk_git_files(self, repo_path='', env=None):
+    def walk_git_files(self, repo_mainpath='', env=None):
         """
         An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive. Skips files that match
@@ -284,11 +284,11 @@ class GitArchiver:
 
         Recurs into submodules as well.
 
-        @param repo_path: Path to the git submodule repository relative to main_repo_abspath.
+        @param repo_mainpath: Path to the git submodule repository relative to main_repo_abspath.
 
         @return: Generator to traverse files under git control relative to main_repo_abspath.
         """
-        repo_abspath = path.join(self.main_repo_abspath, repo_path)
+        repo_abspath = path.join(self.main_repo_abspath, repo_mainpath)
         assert repo_abspath not in self._check_attr_gens
         self._check_attr_gens[repo_abspath] = self.check_git_attr(repo_abspath, ['export-ignore'], env=env)
 
@@ -301,38 +301,38 @@ class GitArchiver:
             submodule_env.pop(e, None)
 
         try:
-            repo_file_paths = self.list_repo_files(repo_abspath, env=env)
+            file_repopaths = self.list_repo_files(repo_abspath, env=env)
 
-            for repo_file_path in repo_file_paths:
-                repo_file_abspath = path.join(repo_abspath, repo_file_path)  # absolute file path
-                main_repo_file_path = path.join(repo_path, repo_file_path)  # relative to main_repo_abspath
+            for file_repopath in file_repopaths:
+                file_abspath = path.join(repo_abspath, file_repopath)
+                file_mainpath = path.join(repo_mainpath, file_repopath)
 
-                if not path.islink(repo_file_abspath) and path.isdir(repo_file_abspath):
+                if not path.islink(file_abspath) and path.isdir(file_abspath):
                     continue
 
-                if self.is_file_excluded(repo_abspath, repo_file_path):
+                if self.is_file_excluded(repo_abspath, file_repopath):
                     continue
 
-                yield main_repo_file_path
+                yield file_mainpath
 
             if self.force_sub:
                 self.run_git_shell('git submodule init', repo_abspath, env=env)
                 self.run_git_shell('git submodule update', repo_abspath, env=env)
 
-            for repo_submodule_path in self.list_repo_submodules(repo_abspath, env=env):  # relative to repo_path
-                if self.is_file_excluded(repo_abspath, repo_submodule_path):
+            for submodule_repopath in self.list_repo_submodules(repo_abspath, env=env):
+                if self.is_file_excluded(repo_abspath, submodule_repopath):
                     continue
 
-                main_repo_submodule_path = path.join(repo_path, repo_submodule_path)  # relative to main_repo_abspath
+                submodule_mainpath = path.join(repo_mainpath, submodule_repopath)
 
-                with closing(self.walk_git_files(main_repo_submodule_path, env=submodule_env)) as git_files:
-                    for main_repo_submodule_file_path in git_files:
-                        repo_submodule_file_path = path.relpath(main_repo_submodule_file_path, repo_path)  # relative to repo_path
+                with closing(self.walk_git_files(submodule_mainpath, env=submodule_env)) as git_files:
+                    for file_mainpath in git_files:
+                        file_repopath = path.relpath(file_mainpath, repo_mainpath)
 
-                        if self.is_file_excluded(repo_abspath, repo_submodule_file_path):
+                        if self.is_file_excluded(repo_abspath, file_repopath):
                             continue
 
-                        yield main_repo_submodule_file_path
+                        yield file_mainpath
         finally:
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
@@ -342,9 +342,9 @@ class GitArchiver:
         Generator that returns git attributes for received paths relative to repo_abspath.
 
         >>> archiver = GitArchiver(...)
-        >>> g = archiver.check_git_attr('repo_path', ['export-ignore'])
+        >>> g = archiver.check_git_attr('repo_abspath', ['export-ignore'])
         >>> next(g)
-        >>> attrs = g.send('relative_path')
+        >>> attrs = g.send('file_repopath')
         >>> print(attrs['export-ignore'])
 
         @param repo_abspath: Absolute path to a git repository.
@@ -355,12 +355,12 @@ class GitArchiver:
             env = self.git_env()
         env = {**env, 'GIT_FLUSH': '1'}
 
-        def read_attrs(process, repo_file_path):
-            process.stdin.write(repo_file_path + b'\0')
+        def read_attrs(process, file_repopath):
+            process.stdin.write(file_repopath + b'\0')
             process.stdin.flush()
 
             # For every attribute check-attr will output: <path> NUL <attribute> NUL <info> NUL
-            path, attr, info = b'', b'', b''
+            attr, info = b'', b''
             nuls_count = 0
             nuls_expected = 3 * len(attrs)
 
@@ -373,11 +373,9 @@ class GitArchiver:
                     nuls_count += 1
 
                     if nuls_count % 3 == 0:
-                        yield path, attr, info
+                        yield attr, info
 
-                        path, attr, info = b'', b'', b''
-                elif nuls_count % 3 == 0:
-                    path += b
+                        attr, info = b'', b''
                 elif nuls_count % 3 == 1:
                     attr += b
                 elif nuls_count % 3 == 2:
@@ -390,15 +388,15 @@ class GitArchiver:
 
         with Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env) as process:
             while True:
-                repo_file_path = yield
-                repo_file_path = git_fsencode(fsdecode(repo_file_path))
-                repo_file_attrs = {}
+                file_repopath = yield
+                file_repopath = git_fsencode(fsdecode(file_repopath))
+                file_attrs = {}
 
-                for path, attr, value in read_attrs(process, repo_file_path):
+                for attr, value in read_attrs(process, file_repopath):
                     attr = attr.decode('utf-8')
-                    repo_file_attrs[attr] = value
+                    file_attrs[attr] = value
 
-                yield repo_file_attrs
+                yield file_attrs
 
     def resolve_git_main_repo_abspath(self, abspath):
         """
@@ -480,13 +478,13 @@ class GitArchiver:
         """
         Return an iterator over all files as seen by git in a given repo.
         """
-        repo_file_paths = cls.run_git_shell(
+        file_repopaths = cls.run_git_shell(
             'git ls-files -z --cached --full-name --no-empty-directory',
             cwd=repo_abspath,
             env=env
         )
-        repo_file_paths = repo_file_paths.split(b'\0')[:-1]
-        return (git_fsdecode(p).replace('/', path.sep) for p in repo_file_paths)
+        file_repopaths = file_repopaths.split(b'\0')[:-1]
+        return (git_fsdecode(p).replace('/', path.sep) for p in file_repopaths)
 
     @classmethod
     def list_repo_submodules(cls, repo_abspath, env=None):
@@ -498,9 +496,9 @@ class GitArchiver:
         else:
             shell_command = 'git submodule foreach --quiet \'printf "%s\\0" "$sm_path"\''
 
-        repo_submodule_paths = cls.run_git_shell(shell_command, cwd=repo_abspath, env=env)
-        repo_submodule_paths = repo_submodule_paths.split(b'\0')[:-1]
-        return (git_fsdecode(p).replace('/', path.sep) for p in repo_submodule_paths)
+        submodule_repopaths = cls.run_git_shell(shell_command, cwd=repo_abspath, env=env)
+        submodule_repopaths = submodule_repopaths.split(b'\0')[:-1]
+        return (git_fsdecode(p).replace('/', path.sep) for p in submodule_repopaths)
 
 
 def main(argv=None):
@@ -568,16 +566,16 @@ def main(argv=None):
     if len(args) != 1:
         parser.error("You must specify exactly one output file")
 
-    output_file_path = args[0]
+    output_path = args[0]
 
-    if path.isdir(output_file_path):
+    if path.isdir(output_path):
         parser.error("You cannot use directory as output")
 
     # avoid tarbomb
     if options.prefix is not None:
         options.prefix = path.join(options.prefix, '')
     else:
-        output_name = path.basename(output_file_path)
+        output_name = path.basename(output_path)
         output_name = re.sub(
             r'\.(tar|bz2|gz|xz|zip|zst|tbz2|tgz|txz|tzst|tar\.bz2|tar\.gz|tar\.xz|tar\.zst)$',
             '',
@@ -596,7 +594,7 @@ def main(argv=None):
                                options.extra,
                                path.abspath(options.base_repo) if options.base_repo is not None else None
                                )
-        archiver.create(output_file_path, options.dry_run, compresslevel=options.compresslevel)
+        archiver.create(output_path, options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
         parser.exit(2, f"{e}\n")
 
