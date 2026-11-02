@@ -53,13 +53,6 @@ def git_fsencode(filename):
         return fsencode(filename)
 
 
-def fspath(filename):
-    """
-    Convert filename into str.
-    """
-    return fsdecode(filename)
-
-
 class GitArchiver:
     """
     GitArchiver
@@ -128,10 +121,10 @@ class GitArchiver:
 
         self.main_repo_abspath = self.resolve_git_main_repo_abspath(main_repo_abspath)
 
-        self.prefix = fspath(prefix)
+        self.prefix = fsdecode(prefix)
         self.exclude = exclude
         self.force_sub = force_sub
-        self.extra = [fspath(e) for e in extra] if extra is not None else []
+        self.extra = [fsdecode(e) for e in extra] if extra is not None else []
 
         # Match git's prepare_submodule_repo_env() when running git commands in submodules:
         # clear repository-local variables (e.g. GIT_DIR, GIT_WORK_TREE) that override cwd,
@@ -160,7 +153,7 @@ class GitArchiver:
 
         @param compresslevel: Optional compression level. Interpretation depends on the output format.
         """
-        output_path = fspath(output_path)
+        output_path = fsdecode(output_path)
 
         if output_format is None:
             file_name, file_ext = path.splitext(output_path)
@@ -394,7 +387,7 @@ class GitArchiver:
         with Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, cwd=repo_abspath, env=env) as process:
             while True:
                 repo_file_path = yield
-                repo_file_path = git_fsencode(fspath(repo_file_path))
+                repo_file_path = git_fsencode(fsdecode(repo_file_path))
                 repo_file_attrs = {}
 
                 for path, attr, value in read_attrs(process, repo_file_path):

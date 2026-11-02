@@ -2,6 +2,7 @@ from copy import deepcopy
 import errno
 from functools import partial
 import os
+from os import fsdecode
 from pathlib import Path, PurePosixPath
 from subprocess import check_call
 import sys
@@ -22,7 +23,7 @@ import pycodestyle
 import pytest
 
 import git_archive_all
-from git_archive_all import GitArchiver, fspath
+from git_archive_all import GitArchiver
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def git_env(tmp_path_factory, monkeypatch):
     home_path = tmp_path_factory.getbasetemp()
     e = {
         'GIT_CONFIG_NOSYSTEM': 'true',
-        'HOME': fspath(home_path)
+        'HOME': fsdecode(home_path)
     }
 
     with (home_path / '.gitconfig').open('wb+') as f:
@@ -123,7 +124,7 @@ class Repo:
         dir_path.mkdir(parents=True, exist_ok=True)
 
         for k, v in contents.items():
-            self.add(dir_path / fspath(k), v)
+            self.add(dir_path / fsdecode(k), v)
 
         check_call(['git', 'add', dir_path], cwd=self.path)
         return dir_path
@@ -162,7 +163,7 @@ def make_expected_tree(contents, exclude=True):
                 e['.gitmodules'] = None
 
             for nested_k, nested_v in make_expected_tree(v.contents, exclude).items():
-                nested_k = (PurePosixPath(fspath(k)) / fspath(nested_k)).as_posix()
+                nested_k = (PurePosixPath(fsdecode(k)) / fsdecode(nested_k)).as_posix()
                 e[nested_k] = nested_v
 
     return e
@@ -431,8 +432,8 @@ def test_ignore(exclude, tmp_path, repo):
 
 
 def test_cli(tmp_path, repo):
-    repo_tar_path = fspath(tmp_path / 'repo.tar')
-    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fspath(repo.path), repo_tar_path])
+    repo_tar_path = fsdecode(tmp_path / 'repo.tar')
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fsdecode(repo.path), repo_tar_path])
 
     with TarFile(repo_tar_path, encoding='utf-8') as repo_tar:
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
@@ -449,9 +450,9 @@ def test_cli_log(option, tmp_path, repo, capfd):
     """
     Ensure that CLI logs non-ASCII paths.
     """
-    repo_tar_path = fspath(tmp_path / 'repo.tar')
+    repo_tar_path = fsdecode(tmp_path / 'repo.tar')
     capfd.readouterr()
-    git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', fspath(repo.path), repo_tar_path])
+    git_archive_all.main(['git_archive_all.py', option, '--prefix', '', '-C', fsdecode(repo.path), repo_tar_path])
     out, _ = capfd.readouterr()
 
     assert f" => {os.path.join('data', 'مرحبا بالعالم.dat')}\n" in out
@@ -473,7 +474,7 @@ def test_submodule_local_env(env_vars, tmp_path, repo, monkeypatch):
 
     for name, value in env_vars.items():
         # Absolute, otherwise each git command would resolve against its own cwd.
-        monkeypatch.setenv(name, fspath(repo.path / value))
+        monkeypatch.setenv(name, fsdecode(repo.path / value))
 
     repo_tar_path = tmp_path / 'repo.tar'
     repo.assert_archive(repo_tar_path)
@@ -534,11 +535,11 @@ def test_cli_error_cleanup(output_format, tmp_path, repo):
     """
     Ensure that incomplete archive is removed on error.
     """
-    missing_path = fspath(tmp_path / 'missing')
-    repo_archive_path = fspath(tmp_path / f'repo.{output_format}')
+    missing_path = fsdecode(tmp_path / 'missing')
+    repo_archive_path = fsdecode(tmp_path / f'repo.{output_format}')
 
     with pytest.raises(SystemExit):
-        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', fspath(repo.path), repo_archive_path])
+        git_archive_all.main(['git_archive_all.py', '--include', missing_path, '-C', fsdecode(repo.path), repo_archive_path])
 
     assert not os.path.exists(repo_archive_path)
 
@@ -646,7 +647,7 @@ def test_backslash_separator(output_format, tmp_path, repo, monkeypatch):
     extra_path.write_bytes(b'Namespaces are one honking great idea -- let\'s do more of those!')
     monkeypatch.chdir(tmp_path)
 
-    a = GitArchiver(prefix='archive\\root\\', extra=['extra\\file.dat'], main_repo_abspath=fspath(repo.path))
+    a = GitArchiver(prefix='archive\\root\\', extra=['extra\\file.dat'], main_repo_abspath=fsdecode(repo.path))
 
     expected = make_expected_tree(repo.contents)
     assert sorted(a.walk_git_files()) == sorted(k.replace('/', '\\') for k in expected)
@@ -684,8 +685,8 @@ def test_cli_compresslevel(output_format, compresslevel, tmp_path, repo):
     """
     Ensure that compressed archives are created with the given compression level.
     """
-    repo_archive_path = fspath(tmp_path / f'repo.{output_format}')
-    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fspath(repo.path), compresslevel, repo_archive_path])
+    repo_archive_path = fsdecode(tmp_path / f'repo.{output_format}')
+    git_archive_all.main(['git_archive_all.py', '--prefix', '', '-C', fsdecode(repo.path), compresslevel, repo_archive_path])
 
     with TarFile.open(repo_archive_path, encoding='utf-8') as repo_tar:
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
