@@ -1,9 +1,5 @@
-# Textmate - if you build your xcode projects with it
-*.tm_build_errors
- 
-# osx noise
-.DS_Store
-profile
- 
-# emacs noise
-*~
+__pycache__/
+.coverage
+build/
+dist/
+*.egg-info/
