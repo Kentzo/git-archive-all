@@ -79,7 +79,7 @@ class GitArchiver:
 
     LOG = logging.getLogger('GitArchiver')
 
-    def __init__(self, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None, git_version=None):
+    def __init__(self, *, prefix='', exclude=True, force_sub=False, extra=None, main_repo_abspath=None, git_version=None):
         """
         @param prefix: Prefix used to prepend all paths in the resulting archive.
             Extra file paths are only prefixed if they are not relative.
@@ -136,7 +136,7 @@ class GitArchiver:
             except ValueError:
                 pass
 
-    def create(self, output_path, dry_run=False, output_format=None, compresslevel=None, *, archive_kwargs=None):
+    def create(self, output_path, *, dry_run=False, output_format=None, compresslevel=None, archive_kwargs=None):
         """
         Create the archive at output_path.
 
@@ -276,7 +276,7 @@ class GitArchiver:
             for file_mainpath in git_files:
                 archiver(path.join(self.main_repo_abspath, file_mainpath), path.join(self.prefix, file_mainpath))
 
-    def walk_git_files(self, repo_mainpath='', env=None):
+    def walk_git_files(self, repo_mainpath='', *, env=None):
         """
         An iterator method that yields a file path relative to main_repo_abspath
         for each file that should be included in the archive. Skips files that match
@@ -316,8 +316,8 @@ class GitArchiver:
                 yield file_mainpath
 
             if self.force_sub:
-                self.run_git_shell('git submodule init', repo_abspath, env=env)
-                self.run_git_shell('git submodule update', repo_abspath, env=env)
+                self.run_git_shell('git submodule init', cwd=repo_abspath, env=env)
+                self.run_git_shell('git submodule update', cwd=repo_abspath, env=env)
 
             for submodule_repopath in self.list_repo_submodules(repo_abspath, env=env):
                 if self.is_file_excluded(repo_abspath, submodule_repopath):
@@ -337,7 +337,7 @@ class GitArchiver:
             self._check_attr_gens[repo_abspath].close()
             del self._check_attr_gens[repo_abspath]
 
-    def check_git_attr(self, repo_abspath, attrs, env=None):
+    def check_git_attr(self, repo_abspath, attrs, *, env=None):
         """
         Generator that returns git attributes for received paths relative to repo_abspath.
 
@@ -423,7 +423,7 @@ class GitArchiver:
         return env
 
     @classmethod
-    def run_git_shell(cls, cmd, cwd=None, env=None):
+    def run_git_shell(cls, cmd, *, cwd=None, env=None):
         """
         Run git shell command and read its output.
 
@@ -476,7 +476,7 @@ class GitArchiver:
         return [v.decode('utf-8') for v in output.splitlines()]
 
     @classmethod
-    def list_repo_files(cls, repo_abspath, env=None):
+    def list_repo_files(cls, repo_abspath, *, env=None):
         """
         Return an iterator over all files as seen by git in a given repo.
         """
@@ -489,7 +489,7 @@ class GitArchiver:
         return (git_fsdecode(p).replace('/', path.sep) for p in file_repopaths)
 
     @classmethod
-    def list_repo_submodules(cls, repo_abspath, env=None):
+    def list_repo_submodules(cls, repo_abspath, *, env=None):
         """
         Return an iterator over all direct submodules as seen by git in a given repo.
         """
@@ -590,13 +590,13 @@ def main(argv=None):
         handler.setFormatter(logging.Formatter('%(message)s'))
         GitArchiver.LOG.addHandler(handler)
         GitArchiver.LOG.setLevel(logging.DEBUG if options.verbose else logging.INFO)
-        archiver = GitArchiver(options.prefix,
-                               options.exclude,
-                               options.force_sub,
-                               options.extra,
-                               path.abspath(options.base_repo) if options.base_repo is not None else None
+        archiver = GitArchiver(prefix=options.prefix,
+                               exclude=options.exclude,
+                               force_sub=options.force_sub,
+                               extra=options.extra,
+                               main_repo_abspath=path.abspath(options.base_repo) if options.base_repo is not None else None
                                )
-        archiver.create(output_path, options.dry_run, compresslevel=options.compresslevel)
+        archiver.create(output_path, dry_run=options.dry_run, compresslevel=options.compresslevel)
     except Exception as e:
         parser.exit(2, f"{e}\n")
 
