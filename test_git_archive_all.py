@@ -692,6 +692,22 @@ def test_cli_compresslevel(output_format, compresslevel, tmp_path, repo):
         assert make_actual_tree(repo_tar) == make_expected_tree(repo.contents)
 
 
+def test_create_tar_with_zero_compresslevel(tmp_path, repo):
+    """
+    Ensure that an explicit compression level of 0 (no compression)
+    is accepted for plain tar archives instead of raising
+    "tar cannot be compressed".
+    """
+    repo_tar_path = fsdecode(tmp_path / 'repo.tar')
+    assert git_archive_all.main(
+        ['git_archive_all.py', '--prefix', '', '-C', fsdecode(repo.path),
+         '-0', repo_tar_path]) == 0
+
+    assert Path(repo_tar_path).exists()
+    with TarFile(repo_tar_path, encoding='utf-8'):
+        pass
+
+
 def test_archive_kwargs_tar_format(tmp_path, repo):
     """
     Ensure that archive_kwargs are passed to tarfile.

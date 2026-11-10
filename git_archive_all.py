@@ -186,7 +186,11 @@ class GitArchiver:
 
                 if compresslevel is not None:
                     if mode == 'w':
-                        raise ValueError(f"{output_format} cannot be compressed")
+                        # A level of 0 explicitly requests no compression,
+                        # which a plain tar archive already provides.
+                        if compresslevel:
+                            raise ValueError(f"{output_format} cannot be compressed")
+                        compress_kwargs = {}
                     elif mode == 'w:xz':
                         compress_kwargs = {'preset': compresslevel}
                     elif mode == 'w:zst':
